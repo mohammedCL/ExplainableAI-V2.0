@@ -1,0 +1,33 @@
+# .gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+.venv
+venv/
+env/
+*.egg-info/
+*.egg
+*.log
+
+# VSCode
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Node.js/React
+node_modules/
+dist/
+build/
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Others
+*.joblib
