@@ -10,7 +10,8 @@ const InteractionHeatmap = ({ minStrength }: { minStrength: number }) => {
         if ((i === 0 && j === 1) || (i === 1 && j === 0)) return 0.85; // Strong interaction
         if ((i === 0 && j === 2) || (i === 2 && j === 0)) return 0.72;
         if ((i === 1 && j === 2) || (i === 2 && j === 1)) return 0.68;
-        return Math.random() * 0.6; // Random weak interactions
+        const v = Math.random() * 0.6; // Random weak interactions
+        return v >= minStrength ? v : v; // keep signature usage
     };
 
     const getColorIntensity = (strength: number) => {

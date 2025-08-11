@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getModelOverview } from '../../services/api';
-import { Target, BarChart3, Binary, AlertCircle, Info, Loader2 } from 'lucide-react';
+import { Target, AlertCircle, Info, Loader2 } from 'lucide-react';
 
 const MetricCard = ({ title, value, format, icon }: { title: string; value: number; format: 'percentage' | 'number'; icon: React.ReactNode }) => (
     <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -16,7 +16,7 @@ const MetricCard = ({ title, value, format, icon }: { title: string; value: numb
     </div>
 );
 
-const ModelOverview: React.FC<{ modelType: string }> = ({ modelType }) => {
+const ModelOverview: React.FC<{ modelType: string }> = () => {
     const [overview, setOverview] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -61,14 +61,41 @@ const ModelOverview: React.FC<{ modelType: string }> = ({ modelType }) => {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-4 flex items-center"><Info className="mr-2" /> Model Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div><strong>Model ID:</strong> <span className="text-gray-600 dark:text-gray-400">{overview.model_id}</span></div>
-                    <div><strong>Name:</strong> <span className="text-gray-600 dark:text-gray-400">{overview.name}</span></div>
-                    <div><strong>Type:</strong> <span className="text-gray-600 dark:text-gray-400">{overview.model_type}</span></div>
-                    <div><strong>Version:</strong> <span className="text-gray-600 dark:text-gray-400">{overview.version}</span></div>
-                    <div><strong>Framework:</strong> <span className="text-gray-600 dark:text-gray-400">{overview.framework}</span></div>
-                    <div><strong>Status:</strong> <span className="text-green-500 font-semibold">{overview.status}</span></div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center"><Info className="mr-2" /> Model Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Name:</strong> {overview.name || 'N/A'}</li>
+                            <li><strong>Algorithm:</strong> {overview.algorithm || 'N/A'}</li>
+                            <li><strong>Version:</strong> {overview.version}</li>
+                            <li><strong>Framework:</strong> {overview.framework}</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold mb-1">Training Information</h3>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Created:</strong> {overview.metadata?.created}</li>
+                            <li><strong>Last Trained:</strong> {overview.metadata?.last_trained}</li>
+                            <li><strong>Samples:</strong> {overview.metadata?.samples}</li>
+                            <li><strong>Features:</strong> {overview.metadata?.features}</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold mb-1">Dataset Split</h3>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Train:</strong> {overview.metadata?.dataset_split?.train}</li>
+                            <li><strong>Test:</strong> {overview.metadata?.dataset_split?.test}</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold mb-1">Status</h3>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Health Score:</strong> {overview.metadata?.health_score_pct?.toFixed?.(0)}%</li>
+                            <li><strong>Status:</strong> {overview.status}</li>
+                            <li><strong>Duplicates:</strong> {overview.metadata?.duplicates_pct?.toFixed?.(1)}%</li>
+                            <li><strong>Missing:</strong> {overview.metadata?.missing_pct?.toFixed?.(1)}%</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
