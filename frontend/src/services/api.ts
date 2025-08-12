@@ -55,3 +55,12 @@ export const postThresholdAnalysis = (num_thresholds = 50) => apiClient.post(`/a
 
 // Section 3 - Individual prediction summary
 export const postIndividualPrediction = (instance_idx: number) => apiClient.post('/api/individual-prediction', { instance_idx }).then(res => res.data);
+
+// Section 4 - Dependence
+export const postPartialDependence = (feature: string, num_points = 20) => apiClient.post('/api/partial-dependence', { feature, num_points }).then(res => res.data);
+export const postShapDependence = (feature: string, color_by?: string) => apiClient.post('/api/shap-dependence', { feature, color_by }).then(res => res.data);
+export const postIcePlot = (feature: string, num_points = 20, num_instances = 20) => apiClient.post('/api/ice-plot', { feature, num_points, num_instances }).then(res => res.data);
+
+// Section 5 - Interactions
+export const postInteractionNetwork = (top_k = 30, sample_rows = 200) => apiClient.post('/api/interaction-network', { top_k, sample_rows }).then(res => res.data);
+export const postPairwiseAnalysis = (feature1: string, feature2: string, color_by?: string, sample_size = 1000) => apiClient.post('/api/pairwise-analysis', { feature1, feature2, color_by, sample_size }).then(res => res.data);

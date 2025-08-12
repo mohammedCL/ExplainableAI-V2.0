@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, Search, BarChart3, Settings, AlertCircle, Loader2 } from 'lucide-react';
-import { getFeatureDependence, getModelOverview } from '../../services/api';
+import { getModelOverview, postPartialDependence, postShapDependence, postIcePlot } from '../../services/api';
 
 const FeatureCard = ({ name, description, percentage, isSelected, onClick }: {
     name: string;
@@ -55,85 +55,89 @@ const PlotTypeSelector = ({ selectedType, onTypeChange }: {
     </div>
 );
 
-const DependencePlot = ({ feature, featureValues, shapValues }: { feature: string; featureValues: number[]; shapValues: number[] }) => {
-    const min = Math.min(...shapValues);
-    const max = Math.max(...shapValues);
-    const range = max - min;
+const PDPPlot = ({ y, feature }: { y: number[]; feature: string }) => {
+    const minY = Math.min(...y);
+    const maxY = Math.max(...y);
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <BarChart3 className="mr-2 text-blue-600" />
-                Partial Dependence: {feature}
-            </h3>
-
-            {/* simple SVG scatter plot */}
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />Partial Dependence: {feature}</h3>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
                 <svg viewBox="0 0 100 100" className="w-full h-full">
-                    {featureValues.map((fv, i) => {
-                        const x = ((fv - Math.min(...featureValues)) / (Math.max(...featureValues) - Math.min(...featureValues) || 1)) * 100;
-                        const y = 100 - ((shapValues[i] - min) / (range || 1)) * 100;
-                        return <circle key={i} cx={x} cy={y} r="1.2" fill="#3b82f6" opacity="0.8" />;
+                    {y.map((yv, i) => {
+                        const xNorm = (i / Math.max(1, y.length - 1)) * 100;
+                        const yNorm = 100 - ((yv - minY) / (maxY - minY || 1)) * 100;
+                        return <circle key={i} cx={xNorm} cy={yNorm} r="1.2" fill="#3b82f6" />;
+                    })}
+                    {y.slice(1).map((_, i) => {
+                        const x1 = (i / Math.max(1, y.length - 1)) * 100;
+                        const y1 = 100 - ((y[i] - minY) / (maxY - minY || 1)) * 100;
+                        const x2 = ((i + 1) / Math.max(1, y.length - 1)) * 100;
+                        const y2 = 100 - ((y[i + 1] - minY) / (maxY - minY || 1)) * 100;
+                        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3b82f6" strokeWidth={1} />;
                     })}
                 </svg>
-            </div>
-            <div className="grid grid-cols-3 gap-4 mt-4">
-                <div className="text-center">
-                    <div className="text-lg font-bold text-blue-600">{min.toFixed(3)}</div>
-                    <div className="text-xs text-gray-500">Min Effect</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-lg font-bold text-green-600">{max.toFixed(3)}</div>
-                    <div className="text-xs text-gray-500">Max Effect</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-lg font-bold text-purple-600">{range.toFixed(3)}</div>
-                    <div className="text-xs text-gray-500">Range</div>
-                </div>
             </div>
         </div>
     );
 };
 
-const FeatureImpactAnalysis = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <TrendingUp className="mr-2 text-purple-600" />
-            Feature Impact Analysis
-        </h3>
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Analysis of how the selected feature impacts model predictions
-        </div>
-
-        <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="font-medium text-sm mb-2">Key Insights</div>
-                <ul className="text-xs text-gray-600 space-y-1">
-                    <li>• Feature shows strong positive correlation with predictions</li>
-                    <li>• Impact increases significantly at higher values</li>
-                    <li>• Most influential range: 60k - 120k</li>
-                </ul>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="text-sm font-medium">Strong Impact</div>
-                    <div className="text-xs text-gray-500 mt-1">Above 75th percentile</div>
-                </div>
-                <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <div className="text-sm font-medium">Moderate Impact</div>
-                    <div className="text-xs text-gray-500 mt-1">25th - 75th percentile</div>
-                </div>
+const SHAPDependencePlot = ({ feature_values, shap_values }: { feature_values: (number | string)[]; shap_values: number[] }) => {
+    const minX = Math.min(...feature_values.map(v => Number(v)));
+    const maxX = Math.max(...feature_values.map(v => Number(v)));
+    const minY = Math.min(...shap_values);
+    const maxY = Math.max(...shap_values);
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />SHAP Dependence</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {feature_values.map((fx, i) => {
+                        const x = ((Number(fx) - minX) / (maxX - minX || 1)) * 100;
+                        const y = 100 - ((shap_values[i] - minY) / (maxY - minY || 1)) * 100;
+                        return <circle key={i} cx={x} cy={y} r="1.1" fill="#3b82f6" opacity={0.7} />;
+                    })}
+                </svg>
             </div>
         </div>
-    </div>
-);
+    );
+};
+
+const ICEPlot = ({ curves, feature }: { curves: Array<{ x: (number | string)[]; y: number[] }>; feature: string }) => {
+    const allY = curves.flatMap(c => c.y);
+    const minY = Math.min(...allY);
+    const maxY = Math.max(...allY);
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />ICE Plot: {feature}</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {curves.map((c, ci) => (
+                        <g key={ci}>
+                            {c.y.slice(1).map((_, i) => {
+                                const x1 = (i / Math.max(1, c.y.length - 1)) * 100;
+                                const y1 = 100 - ((c.y[i] - minY) / (maxY - minY || 1)) * 100;
+                                const x2 = ((i + 1) / Math.max(1, c.y.length - 1)) * 100;
+                                const y2 = 100 - ((c.y[i + 1] - minY) / (maxY - minY || 1)) * 100;
+                                return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#60a5fa" strokeWidth={0.8} opacity={0.6} />;
+                            })}
+                        </g>
+                    ))}
+                </svg>
+            </div>
+        </div>
+    );
+};
+
+// removed unused placeholder impact component
 
 const FeatureDependence: React.FC<{ modelType?: string }> = () => {
     const [selectedFeature, setSelectedFeature] = useState('');
     const [plotType, setPlotType] = useState('partial');
     const [searchTerm, setSearchTerm] = useState('');
     const [featureList, setFeatureList] = useState<string[]>([]);
-    const [plotData, setPlotData] = useState<{ feature_values: number[], shap_values: number[] } | null>(null);
+    const [pdp, setPdp] = useState<any>(null);
+    const [shapDep, setShapDep] = useState<any>(null);
+    const [ice, setIce] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -157,8 +161,14 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
             try {
                 setLoading(true);
                 setError('');
-                const data = await getFeatureDependence(selectedFeature);
-                setPlotData(data);
+                const [p, s, i] = await Promise.all([
+                    postPartialDependence(selectedFeature, 25),
+                    postShapDependence(selectedFeature),
+                    postIcePlot(selectedFeature, 15, 20)
+                ]);
+                setPdp(p);
+                setShapDep(s);
+                setIce(i);
             } catch (e: any) {
                 setError(e.response?.data?.detail || 'Failed to load feature dependence');
             } finally {
@@ -229,15 +239,52 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
                             <span>{error}</span>
                         </div>
                     )}
-                    {plotData && !loading && (
-                        <DependencePlot feature={selectedFeature} featureValues={plotData.feature_values} shapValues={plotData.shap_values} />
+                    {!loading && plotType === 'partial' && pdp && (
+                        <PDPPlot y={pdp.y} feature={selectedFeature} />
+                    )}
+                    {!loading && plotType === 'shap' && shapDep && (
+                        <SHAPDependencePlot feature_values={shapDep.feature_values} shap_values={shapDep.shap_values} />
+                    )}
+                    {!loading && plotType === 'ice' && ice && (
+                        <ICEPlot curves={ice.curves} feature={selectedFeature} />
                     )}
                 </div>
             </div>
 
+            {/* Feature Impact Panel based on PDP */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <PlotTypeSelector selectedType={plotType} onTypeChange={setPlotType} />
-                <FeatureImpactAnalysis />
+                {pdp && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 text-purple-600" />Feature Impact Analysis</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                <div className="text-xs text-gray-500">Type</div>
+                                <div className="text-sm font-semibold">{pdp.impact.feature_type}</div>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                                <div className="text-xs text-gray-500">Importance</div>
+                                <div className="text-sm font-semibold">{pdp.impact.importance_percentage.toFixed(1)}%</div>
+                            </div>
+                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
+                                <div className="text-xs text-gray-500">Effect Range</div>
+                                <div className="text-sm font-semibold">{pdp.impact.effect_range.toFixed(3)}</div>
+                            </div>
+                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
+                                <div className="text-xs text-gray-500">Trend</div>
+                                <div className="text-sm font-semibold">{pdp.impact.trend_analysis.direction}</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div className="text-xs text-gray-500">Confidence</div>
+                                <div className="text-sm font-semibold">{pdp.impact.confidence_score}%</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div className="text-xs text-gray-500">Summary</div>
+                                <div className="text-sm">{pdp.impact.impact_summary}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

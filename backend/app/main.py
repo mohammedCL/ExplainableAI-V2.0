@@ -124,8 +124,51 @@ async def get_roc_analysis(token: str = Depends(verify_token)):
 async def post_threshold_analysis(num_thresholds: int = 50, token: str = Depends(verify_token)):
     return handle_request(model_service.threshold_analysis, num_thresholds)
 
-# --- Section 3 API ---
+# --- Section 3 API ---  
 @app.post("/api/individual-prediction", tags=["Prediction"])
 async def post_individual_prediction(payload: Dict = Body(...), token: str = Depends(verify_token)):
     instance_idx = int(payload.get("instance_idx", 0))
     return handle_request(model_service.individual_prediction, instance_idx)
+
+# --- Section 4 APIs ---
+@app.post("/api/partial-dependence", tags=["Dependence"])
+async def post_partial_dependence(payload: Dict = Body(...), token: str = Depends(verify_token)):
+    feature = payload.get("feature")
+    if not feature:
+        raise HTTPException(status_code=400, detail="Missing 'feature'")
+    num_points = int(payload.get("num_points", 20))
+    return handle_request(model_service.partial_dependence, feature, num_points)
+
+@app.post("/api/shap-dependence", tags=["Dependence"])
+async def post_shap_dependence(payload: Dict = Body(...), token: str = Depends(verify_token)):
+    feature = payload.get("feature")
+    if not feature:
+        raise HTTPException(status_code=400, detail="Missing 'feature'")
+    color_by = payload.get("color_by")
+    return handle_request(model_service.shap_dependence, feature, color_by)
+
+@app.post("/api/ice-plot", tags=["Dependence"])
+async def post_ice_plot(payload: Dict = Body(...), token: str = Depends(verify_token)):
+    feature = payload.get("feature")
+    if not feature:
+        raise HTTPException(status_code=400, detail="Missing 'feature'")
+    num_points = int(payload.get("num_points", 20))
+    num_instances = int(payload.get("num_instances", 20))
+    return handle_request(model_service.ice_plot, feature, num_points, num_instances)
+
+# --- Section 5 APIs ---
+@app.post("/api/interaction-network", tags=["Interactions"])
+async def post_interaction_network(payload: Dict = Body({}), token: str = Depends(verify_token)):
+    top_k = int(payload.get("top_k", 30))
+    sample_rows = int(payload.get("sample_rows", 200))
+    return handle_request(model_service.interaction_network, top_k, sample_rows)
+
+@app.post("/api/pairwise-analysis", tags=["Interactions"])
+async def post_pairwise_analysis(payload: Dict = Body(...), token: str = Depends(verify_token)):
+    f1 = payload.get("feature1")
+    f2 = payload.get("feature2")
+    if not f1 or not f2:
+        raise HTTPException(status_code=400, detail="Missing 'feature1' or 'feature2'")
+    color_by = payload.get("color_by")
+    sample_size = int(payload.get("sample_size", 1000))
+    return handle_request(model_service.pairwise_analysis, f1, f2, color_by, sample_size)
