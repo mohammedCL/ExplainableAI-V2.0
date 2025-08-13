@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { AlertCircle, Loader2, TrendingUp, Search, BarChart3, Settings } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { TrendingUp, Search, BarChart3, Settings, AlertCircle, Loader2 } from 'lucide-react';
+import { getModelOverview, postPartialDependence, postShapDependence, postIcePlot } from '../../services/api';
 
 const FeatureCard = ({ name, description, percentage, isSelected, onClick }: {
     name: string;
@@ -10,8 +11,8 @@ const FeatureCard = ({ name, description, percentage, isSelected, onClick }: {
 }) => (
     <div
         className={`p-4 rounded-lg cursor-pointer border-2 transition-all ${isSelected
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
             }`}
         onClick={onClick}
     >
@@ -41,8 +42,8 @@ const PlotTypeSelector = ({ selectedType, onTypeChange }: {
                 <div
                     key={type.id}
                     className={`p-3 rounded-lg cursor-pointer border text-center ${selectedType === type.id
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                     onClick={() => onTypeChange(type.id)}
                 >
@@ -54,100 +55,132 @@ const PlotTypeSelector = ({ selectedType, onTypeChange }: {
     </div>
 );
 
-const DependencePlot = ({ feature, plotType }: { feature: string; plotType: string }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <BarChart3 className="mr-2 text-blue-600" />
-            PARTIAL Plot: {feature}
-        </h3>
-        <div className="text-sm text-gray-600 mb-4">
-            {feature} in thousands
-        </div>
-
-        {/* Simulated plot area */}
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-64 flex items-center justify-center">
-            <div className="text-center">
-                <TrendingUp className="w-12 h-12 text-blue-500 mx-auto mb-2" />
-                <div className="text-sm text-gray-600">Partial Dependence Plot</div>
-                <div className="text-xs text-gray-500 mt-1">Showing relationship for {feature}</div>
+const PDPPlot = ({ y, feature }: { y: number[]; feature: string }) => {
+    const minY = Math.min(...y);
+    const maxY = Math.max(...y);
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />Partial Dependence: {feature}</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {y.map((yv, i) => {
+                        const xNorm = (i / Math.max(1, y.length - 1)) * 100;
+                        const yNorm = 100 - ((yv - minY) / (maxY - minY || 1)) * 100;
+                        return <circle key={i} cx={xNorm} cy={yNorm} r="1.2" fill="#3b82f6" />;
+                    })}
+                    {y.slice(1).map((_, i) => {
+                        const x1 = (i / Math.max(1, y.length - 1)) * 100;
+                        const y1 = 100 - ((y[i] - minY) / (maxY - minY || 1)) * 100;
+                        const x2 = ((i + 1) / Math.max(1, y.length - 1)) * 100;
+                        const y2 = 100 - ((y[i + 1] - minY) / (maxY - minY || 1)) * 100;
+                        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3b82f6" strokeWidth={1} />;
+                    })}
+                </svg>
             </div>
         </div>
+    );
+};
 
-        {/* Plot statistics */}
-        <div className="grid grid-cols-4 gap-4 mt-4">
-            <div className="text-center">
-                <div className="text-lg font-bold text-blue-600">0.260</div>
-                <div className="text-xs text-gray-500">Min Effect</div>
-            </div>
-            <div className="text-center">
-                <div className="text-lg font-bold text-green-600">0.780</div>
-                <div className="text-xs text-gray-500">Max Effect</div>
-            </div>
-            <div className="text-center">
-                <div className="text-lg font-bold text-purple-600">0.520</div>
-                <div className="text-xs text-gray-500">Range</div>
-            </div>
-            <div className="text-center">
-                <div className="text-lg font-bold text-orange-600">83.3%</div>
-                <div className="text-xs text-gray-500">Avg Confidence</div>
+const SHAPDependencePlot = ({ feature_values, shap_values }: { feature_values: (number | string)[]; shap_values: number[] }) => {
+    const minX = Math.min(...feature_values.map(v => Number(v)));
+    const maxX = Math.max(...feature_values.map(v => Number(v)));
+    const minY = Math.min(...shap_values);
+    const maxY = Math.max(...shap_values);
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />SHAP Dependence</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {feature_values.map((fx, i) => {
+                        const x = ((Number(fx) - minX) / (maxX - minX || 1)) * 100;
+                        const y = 100 - ((shap_values[i] - minY) / (maxY - minY || 1)) * 100;
+                        return <circle key={i} cx={x} cy={y} r="1.1" fill="#3b82f6" opacity={0.7} />;
+                    })}
+                </svg>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
-const FeatureImpactAnalysis = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <TrendingUp className="mr-2 text-purple-600" />
-            Feature Impact Analysis
-        </h3>
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Analysis of how the selected feature impacts model predictions
-        </div>
-
-        <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="font-medium text-sm mb-2">Key Insights</div>
-                <ul className="text-xs text-gray-600 space-y-1">
-                    <li>• Feature shows strong positive correlation with predictions</li>
-                    <li>• Impact increases significantly at higher values</li>
-                    <li>• Most influential range: 60k - 120k</li>
-                </ul>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="text-sm font-medium">Strong Impact</div>
-                    <div className="text-xs text-gray-500 mt-1">Above 75th percentile</div>
-                </div>
-                <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <div className="text-sm font-medium">Moderate Impact</div>
-                    <div className="text-xs text-gray-500 mt-1">25th - 75th percentile</div>
-                </div>
+const ICEPlot = ({ curves, feature }: { curves: Array<{ x: (number | string)[]; y: number[] }>; feature: string }) => {
+    const allY = curves.flatMap(c => c.y);
+    const minY = Math.min(...allY);
+    const maxY = Math.max(...allY);
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center"><BarChart3 className="mr-2 text-blue-600" />ICE Plot: {feature}</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-72">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {curves.map((c, ci) => (
+                        <g key={ci}>
+                            {c.y.slice(1).map((_, i) => {
+                                const x1 = (i / Math.max(1, c.y.length - 1)) * 100;
+                                const y1 = 100 - ((c.y[i] - minY) / (maxY - minY || 1)) * 100;
+                                const x2 = ((i + 1) / Math.max(1, c.y.length - 1)) * 100;
+                                const y2 = 100 - ((c.y[i + 1] - minY) / (maxY - minY || 1)) * 100;
+                                return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#60a5fa" strokeWidth={0.8} opacity={0.6} />;
+                            })}
+                        </g>
+                    ))}
+                </svg>
             </div>
         </div>
-    </div>
-);
+    );
+};
+
+// removed unused placeholder impact component
 
 const FeatureDependence: React.FC<{ modelType?: string }> = () => {
-    const [selectedFeature, setSelectedFeature] = useState('Annual_Income');
+    const [selectedFeature, setSelectedFeature] = useState('');
     const [plotType, setPlotType] = useState('partial');
     const [searchTerm, setSearchTerm] = useState('');
+    const [featureList, setFeatureList] = useState<string[]>([]);
+    const [pdp, setPdp] = useState<any>(null);
+    const [shapDep, setShapDep] = useState<any>(null);
+    const [ice, setIce] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const features = [
-        { name: 'Customer_Age', description: 'Age of the customer in years', percentage: '34.2%' },
-        { name: 'Annual_Income', description: 'Annual Income in thousands', percentage: '28.5%' },
-        { name: 'Credit_Score', description: 'Credit score (300-850)', percentage: '15.6%' },
-        { name: 'Account_Balance', description: 'Current account balance', percentage: '12.3%' }
-    ];
+    useEffect(() => {
+        // load features from overview
+        (async () => {
+            try {
+                const overview = await getModelOverview();
+                const names: string[] = overview.feature_names || [];
+                setFeatureList(names);
+                if (names.length > 0) setSelectedFeature(names[0]);
+            } catch (e: any) {
+                setError(e.response?.data?.detail || 'Unable to load feature list');
+            }
+        })();
+    }, []);
 
-    const filteredFeatures = features.filter(f =>
-        f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    useEffect(() => {
+        if (!selectedFeature) return;
+        (async () => {
+            try {
+                setLoading(true);
+                setError('');
+                const [p, s, i] = await Promise.all([
+                    postPartialDependence(selectedFeature, 25),
+                    postShapDependence(selectedFeature),
+                    postIcePlot(selectedFeature, 15, 20)
+                ]);
+                setPdp(p);
+                setShapDep(s);
+                setIce(i);
+            } catch (e: any) {
+                setError(e.response?.data?.detail || 'Failed to load feature dependence');
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [selectedFeature]);
+
+    const filteredFeatures = featureList.filter(f => f.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+        <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 w-full">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold">Feature Dependence</h1>
                 <p className="text-sm text-gray-500">Explore how individual features affect model predictions across their value ranges</p>
@@ -182,12 +215,12 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                         {filteredFeatures.map((feature) => (
                             <FeatureCard
-                                key={feature.name}
-                                name={feature.name}
-                                description={feature.description}
-                                percentage={feature.percentage}
-                                isSelected={selectedFeature === feature.name}
-                                onClick={() => setSelectedFeature(feature.name)}
+                                key={feature}
+                                name={feature}
+                                description={''}
+                                percentage={''}
+                                isSelected={selectedFeature === feature}
+                                onClick={() => setSelectedFeature(feature)}
                             />
                         ))}
                     </div>
@@ -195,13 +228,63 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
 
                 {/* Plot Display */}
                 <div className="lg:col-span-2">
-                    <DependencePlot feature={selectedFeature} plotType={plotType} />
+                    {loading && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-72 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                        </div>
+                    )}
+                    {error && !loading && (
+                        <div className="p-4 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center">
+                            <AlertCircle className="mr-2 flex-shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
+                    {!loading && plotType === 'partial' && pdp && (
+                        <PDPPlot y={pdp.y} feature={selectedFeature} />
+                    )}
+                    {!loading && plotType === 'shap' && shapDep && (
+                        <SHAPDependencePlot feature_values={shapDep.feature_values} shap_values={shapDep.shap_values} />
+                    )}
+                    {!loading && plotType === 'ice' && ice && (
+                        <ICEPlot curves={ice.curves} feature={selectedFeature} />
+                    )}
                 </div>
             </div>
 
+            {/* Feature Impact Panel based on PDP */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <PlotTypeSelector selectedType={plotType} onTypeChange={setPlotType} />
-                <FeatureImpactAnalysis />
+                {pdp && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 text-purple-600" />Feature Impact Analysis</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                <div className="text-xs text-gray-500">Type</div>
+                                <div className="text-sm font-semibold">{pdp.impact.feature_type}</div>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                                <div className="text-xs text-gray-500">Importance</div>
+                                <div className="text-sm font-semibold">{pdp.impact.importance_percentage.toFixed(1)}%</div>
+                            </div>
+                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
+                                <div className="text-xs text-gray-500">Effect Range</div>
+                                <div className="text-sm font-semibold">{pdp.impact.effect_range.toFixed(3)}</div>
+                            </div>
+                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
+                                <div className="text-xs text-gray-500">Trend</div>
+                                <div className="text-sm font-semibold">{pdp.impact.trend_analysis.direction}</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div className="text-xs text-gray-500">Confidence</div>
+                                <div className="text-sm font-semibold">{pdp.impact.confidence_score}%</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                <div className="text-xs text-gray-500">Summary</div>
+                                <div className="text-sm">{pdp.impact.impact_summary}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

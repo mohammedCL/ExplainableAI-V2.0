@@ -98,7 +98,7 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
 
     const [prediction, setPrediction] = useState(0.95);
     const [confidence, setConfidence] = useState(0.88);
-    const [error, setError] = useState('');
+    const [error] = useState('');
 
     const featureImpacts = [
         { name: 'Customer_Age', impact: 0.1 },
@@ -134,8 +134,8 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
-            <div className="p-6 max-w-full">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 w-full">
+            <div className="p-0 sm:p-2 md:p-4 lg:p-6 max-w-none">
                 <div className="space-y-6">
                     <div className="flex items-center justify-between">
                         <h1 className="text-3xl font-bold">What-If Analysis</h1>
