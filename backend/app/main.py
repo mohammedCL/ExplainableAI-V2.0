@@ -4,9 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import Dict
 
-from app.core.config import settings
-from app.core.auth import verify_token
-from app.services.model_service import ModelService
+from core.config import settings
+from core.auth import verify_token
+from services.model_service import ModelService
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
@@ -19,6 +19,26 @@ app.add_middleware(
 )
 
 model_service = ModelService()
+
+# # Auto-load model and data on startup
+# @app.on_event("startup")
+# async def startup_event():
+#     try:
+#         model_path = os.path.join(settings.STORAGE_DIR, "cancer_model.joblib")
+#         data_path = os.path.join(settings.STORAGE_DIR, "breast_cancer_dataset.csv")
+#         target_column = "target"
+        
+#         if os.path.exists(model_path) and os.path.exists(data_path):
+#             print(f"Auto-loading model from {model_path}")
+#             print(f"Auto-loading data from {data_path}")
+#             result = model_service.load_model_and_data(model_path, data_path, target_column)
+#             print("✅ Model and data loaded successfully on startup!")
+#         else:
+#             print("❌ Model or data files not found, waiting for upload...")
+#     except Exception as e:
+#         print(f"❌ Error auto-loading model: {e}")
+#         import traceback
+#         traceback.print_exc()
 
 # --- Utility Function for Error Handling ---
 def handle_request(service_func, *args, **kwargs):
