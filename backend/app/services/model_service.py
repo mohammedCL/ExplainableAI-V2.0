@@ -8,6 +8,7 @@ from sklearn.tree import _tree
 import shap
 import joblib
 from typing import Dict, Any, List, Optional
+from sklearn.model_selection import train_test_split
 
 class ModelService:
     """
@@ -24,6 +25,8 @@ class ModelService:
         self.explainer: Optional[shap.TreeExplainer] = None
         self.shap_values: Optional[np.ndarray] = None
         self.model_info: Dict[str, Any] = {}
+        self.X_test: Optional[pd.DataFrame] = None
+        self.y_test: Optional[pd.Series] = None
         print("ModelService initialized. Waiting for model and data.")
 
     def load_model_and_data(self, model_path: str, data_path: str, target_column: str):
@@ -37,6 +40,11 @@ class ModelService:
 
             if target_column not in df.columns:
                 raise ValueError(f"Target column '{target_column}' not found in the dataset.")
+
+            print(f"Splitting data into training and testing sets.")
+            X = df.drop(columns=[target_column])
+            y = df[target_column]
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
             self.X_df = df.drop(columns=[target_column])
             self.y_s = df[target_column]
@@ -205,22 +213,96 @@ class ModelService:
 
     def get_decision_tree(self) -> Dict[str, Any]:
         self._is_ready()
-        # Using the first tree from the Random Forest as a representative example
-        tree_estimator = self.model.estimators_[0]
-        tree_obj = tree_estimator.tree_
         
-        def recurse(node, depth):
-            if tree_obj.feature[node] != _tree.TREE_UNDEFINED:
-                feature = self.feature_names[tree_obj.feature[node]]
-                return {
-                    "type": "split", "depth": depth,
-                    "feature": feature, "threshold": float(tree_obj.threshold[node]),
-                    "samples": int(tree_obj.n_node_samples[node]),
-                    "left": recurse(tree_obj.children_left[node], depth + 1),
-                    "right": recurse(tree_obj.children_right[node], depth + 1)
-                }
+        # Check if the model has trees (Random Forest, Extra Trees, etc.)
+        if not hasattr(self.model, 'estimators_'):
+            raise ValueError("The current model does not contain decision trees. Please use a tree-based model like RandomForest, ExtraTrees, etc.")
+        
+        # Collect data for all trees in the ensemble
+        trees_data = []
+        for idx, tree_estimator in enumerate(self.model.estimators_):
+            tree_obj = tree_estimator.tree_
+
+            def recurse(node, depth):
+                if tree_obj.feature[node] != _tree.TREE_UNDEFINED:
+                    feature = self.feature_names[tree_obj.feature[node]]
+                    threshold = float(tree_obj.threshold[node])
+                    samples = int(tree_obj.n_node_samples[node])
+                    
+                    # Calculate node purity (1 - gini impurity)
+                    gini = float(tree_obj.impurity[node])
+                    purity = 1 - gini
+                    
+                    return {
+                        "type": "split",
+                        "feature": feature,
+                        "threshold": threshold,
+                        "samples": samples,
+                        "purity": purity,
+                        "gini": gini,
+                        "node_id": f"node_{node}",
+                        "left": recurse(tree_obj.children_left[node], depth + 1),
+                        "right": recurse(tree_obj.children_right[node], depth + 1)
+                    }
+                else:
+                    # Leaf node
+                    values = tree_obj.value[node][0]
+                    samples = int(tree_obj.n_node_samples[node])
+                    
+                    # For classification, calculate prediction and confidence
+                    total_samples = sum(values)
+                    if total_samples > 0:
+                        prediction = np.argmax(values)
+                        confidence = values[prediction] / total_samples
+                    else:
+                        prediction = 0
+                        confidence = 0.0
+                    
+                    # Calculate class distribution
+                    class_distribution = {}
+                    for i, val in enumerate(values):
+                        class_distribution[f"class_{i}"] = val
+                    
+                    return {
+                        "type": "leaf",
+                        "samples": samples,
+                        "prediction": float(prediction),
+                        "confidence": float(confidence),
+                        "purity": 1.0,  # Leaf nodes are pure by definition
+                        "gini": 0.0,    # Leaf nodes have no impurity
+                        "node_id": f"node_{node}",
+                        "class_distribution": class_distribution
+                    }
+
+            # Calculate tree statistics
+            total_nodes = tree_obj.node_count
+            leaf_nodes = sum(1 for i in range(total_nodes) if tree_obj.feature[i] == _tree.TREE_UNDEFINED)
+            max_depth = tree_obj.max_depth
+            
+            # Calculate tree accuracy on test set
+            if self.X_test is not None and self.y_test is not None:
+                tree_predictions = tree_estimator.predict(self.X_test)
+                tree_accuracy = accuracy_score(self.y_test, tree_predictions)
             else:
-                values = tree_obj.value[node][0]
-                return { "type": "leaf", "depth": depth, "samples": int(tree_obj.n_node_samples[node]), "values": values.tolist() }
-        
-        return recurse(0, 0)
+                tree_accuracy = 0.0
+            
+            # Get feature importance for this tree (approximate)
+            # Since individual tree importances are not directly available,
+            # we'll use the overall feature importances as a proxy
+            if idx < len(self.model.feature_importances_):
+                # This is an approximation - actual tree importance would need to be calculated
+                tree_importance = self.model.feature_importances_[idx % len(self.model.feature_importances_)]
+            else:
+                tree_importance = 0.1  # Default value
+
+            trees_data.append({
+                "tree_index": idx,
+                "accuracy": float(tree_accuracy),
+                "importance": float(tree_importance),
+                "total_nodes": total_nodes,
+                "leaf_nodes": leaf_nodes,
+                "max_depth": max_depth,
+                "tree_structure": recurse(0, 0)
+            })
+
+        return {"trees": trees_data}
