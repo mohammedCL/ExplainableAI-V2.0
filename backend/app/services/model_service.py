@@ -660,7 +660,17 @@ class ModelService:
             trees_data.append({
                 "tree_index": idx,
                 "accuracy": float(tree_accuracy),
-                "importance": float(tree_importance),
+            # Get feature importance for this tree
+            # Use the actual feature_importances_ of the individual tree if available
+            if hasattr(tree_estimator, "feature_importances_"):
+                tree_importance = tree_estimator.feature_importances_.tolist()
+            else:
+                tree_importance = None
+
+            trees_data.append({
+                "tree_index": idx,
+                "accuracy": float(tree_accuracy),
+                "importance": tree_importance,
                 "total_nodes": total_nodes,
                 "leaf_nodes": leaf_nodes,
                 "max_depth": max_depth,
