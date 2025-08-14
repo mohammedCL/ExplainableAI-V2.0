@@ -47,18 +47,30 @@ class ModelService:
             print(f"Splitting data into training and testing sets.")
             X = df.drop(columns=[target_column])
             y = df[target_column]
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Convert to numpy arrays to avoid feature name warnings
+            X_array = X.values
+            y_array = y.values
+            
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+                X_array, y_array, test_size=0.2, random_state=42
+            )
+            
+            # Convert back to DataFrames for analysis but use position-based indexing for model predictions
+            self.X_train = pd.DataFrame(self.X_train, columns=X.columns)
+            self.X_test = pd.DataFrame(self.X_test, columns=X.columns)
+            self.y_train = pd.Series(self.y_train, name=target_column)
+            self.y_test = pd.Series(self.y_test, name=target_column)
 
-            self.X_df = df.drop(columns=[target_column])
-            self.y_s = df[target_column]
-            self.feature_names = list(self.X_df.columns)
+            self.X_df = X  # Keep original feature names for analysis
+            self.y_s = y
+            self.feature_names = list(X.columns)
             self.target_name = target_column
             
             print("Creating SHAP explainer...")
+            # Use numpy arrays for SHAP to avoid feature name warnings
             self.explainer = shap.TreeExplainer(self.model)
-            # For classification, shap_values is a list [class_0_vals, class_1_vals]
-            # We will use this structure directly in our methods.
-            self.shap_values = self.explainer.shap_values(self.X_df)
+            self.shap_values = self.explainer.shap_values(X_array)
             print("SHAP explainer created successfully.")
 
             # Basic dataset diagnostics
@@ -100,8 +112,9 @@ class ModelService:
     
     def get_model_overview(self) -> Dict[str, Any]:
         self._is_ready()
-        y_pred = self.model.predict(self.X_df)
-        y_proba = self.model.predict_proba(self.X_df)[:, 1]
+        # Use numpy arrays for model predictions to avoid feature name warnings
+        y_pred = self.model.predict(self.X_df.values)
+        y_proba = self.model.predict_proba(self.X_df.values)[:, 1]
 
         feature_schema = []
         for feature in self.feature_names:
@@ -150,8 +163,8 @@ class ModelService:
 
     def get_classification_stats(self) -> Dict[str, Any]:
         self._is_ready()
-        y_pred = self.model.predict(self.X_df)
-        y_proba = self.model.predict_proba(self.X_df)[:, 1]
+        y_pred = self.model.predict(self.X_df.values)
+        y_proba = self.model.predict_proba(self.X_df.values)[:, 1]
         cm = confusion_matrix(self.y_s, y_pred)
         fpr, tpr, _ = roc_curve(self.y_s, y_proba)
 
@@ -407,7 +420,7 @@ class ModelService:
         self._is_ready()
         try:
             input_df = pd.DataFrame([features], columns=self.feature_names)
-            prediction_proba = self.model.predict_proba(input_df)
+            prediction_proba = self.model.predict_proba(input_df.values)
             return { "prediction": float(prediction_proba[0, 1]) }
         except Exception as e:
             raise ValueError(f"Error during 'what-if' prediction: {e}")
@@ -428,7 +441,7 @@ class ModelService:
     def list_instances(self, sort_by: str = "prediction", limit: int = 100) -> Dict[str, Any]:
         """Return lightweight list of instances to populate selector UI."""
         self._is_ready()
-        proba = self.model.predict_proba(self.X_df)[:, 1]
+        proba = self.model.predict_proba(self.X_df.values)[:, 1]
         records = []
         for idx in range(len(self.X_df)):
             records.append({
@@ -446,7 +459,7 @@ class ModelService:
     def roc_analysis(self) -> Dict[str, Any]:
         self._is_ready()
         y_true = self.y_s.values
-        y_proba = self.model.predict_proba(self.X_df)[:, 1]
+        y_proba = self.model.predict_proba(self.X_df.values)[:, 1]
         fpr, tpr, thresholds = roc_curve(y_true, y_proba)
         auc_val = float(roc_auc_score(y_true, y_proba))
 
@@ -487,7 +500,7 @@ class ModelService:
     def threshold_analysis(self, num_thresholds: int = 50) -> Dict[str, Any]:
         self._is_ready()
         y_true = self.y_s.values
-        y_proba = self.model.predict_proba(self.X_df)[:, 1]
+        y_proba = self.model.predict_proba(self.X_df.values)[:, 1]
         thresholds = np.linspace(0.0, 1.0, num=num_thresholds)
         results = []
         for thr in thresholds:
@@ -630,7 +643,7 @@ class ModelService:
             
             # Calculate tree accuracy on test set
             if self.X_test is not None and self.y_test is not None:
-                tree_predictions = tree_estimator.predict(self.X_test)
+                tree_predictions = tree_estimator.predict(self.X_test.values)
                 tree_accuracy = accuracy_score(self.y_test, tree_predictions)
             else:
                 tree_accuracy = 0.0
@@ -675,7 +688,7 @@ class ModelService:
         for v in grid:
             X_mod = self.X_df.copy()
             X_mod[feature_name] = v
-            proba = self.model.predict_proba(X_mod)[:, 1]
+            proba = self.model.predict_proba(X_mod.values)[:, 1]
             preds.append(float(np.mean(proba)))
 
         # Impact metrics
