@@ -5,7 +5,7 @@ import os
 from typing import Dict
 from typing import List
 
-from core.config import settings
+from app.core.config import settings
 from core.auth import verify_token
 from services.model_service import ModelService
 
