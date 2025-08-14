@@ -6,8 +6,9 @@ from typing import Dict
 from typing import List
 
 from app.core.config import settings
-from app.core.auth import verify_token
-from app.services.model_service import ModelService
+from app.app.core.auth import verify_token
+from app.app.services.model_service import ModelService
+from app.services.ai_explanation_service import AIExplanationService
 from app.services.ai_explanation_service import AIExplanationService
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
@@ -21,6 +22,7 @@ app.add_middleware(
 )
 
 model_service = ModelService()
+ai_explanation_service = AIExplanationService()
 ai_explanation_service = AIExplanationService()
 
 # # Auto-load model and data on startup
@@ -65,7 +67,7 @@ def read_root():
 @app.post("/upload/model-and-data", tags=["Setup"])
 async def upload_model_and_data(
     token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A .joblib model file."),
+    model_file: UploadFile = File(..., description="A model file (.joblib, .pkl, .pickle, or .onnx)."),
     data_file: UploadFile = File(..., description="A .csv dataset file."),
     target_column: str = Form(..., description="The name of the target variable column in the CSV.")
 ):
@@ -78,6 +80,31 @@ async def upload_model_and_data(
         buffer.write(await data_file.read())
 
     return handle_request(model_service.load_model_and_data, model_path, data_path, target_column)
+
+@app.post("/upload/model-and-separate-datasets", tags=["Setup"])
+async def upload_model_and_separate_datasets(
+    token: str = Depends(verify_token),
+    model_file: UploadFile = File(..., description="A model file (.joblib, .pkl, .pickle, or .onnx)."),
+    train_file: UploadFile = File(..., description="Training dataset CSV file."),
+    test_file: UploadFile = File(..., description="Test dataset CSV file."),
+    target_column: str = Form(..., description="The name of the target variable column in both CSV files.")
+):
+    # Save model file
+    model_path = os.path.join(settings.STORAGE_DIR, model_file.filename)
+    with open(model_path, "wb") as buffer:
+        buffer.write(await model_file.read())
+    
+    # Save training dataset
+    train_path = os.path.join(settings.STORAGE_DIR, f"train_{train_file.filename}")
+    with open(train_path, "wb") as buffer:
+        buffer.write(await train_file.read())
+    
+    # Save test dataset
+    test_path = os.path.join(settings.STORAGE_DIR, f"test_{test_file.filename}")
+    with open(test_path, "wb") as buffer:
+        buffer.write(await test_file.read())
+
+    return handle_request(model_service.load_model_and_separate_datasets, model_path, train_path, test_path, target_column)
 
 @app.get("/analysis/overview", tags=["Analysis"])
 async def get_overview(token: str = Depends(verify_token)):
@@ -106,6 +133,10 @@ async def get_feature_dependence(feature_name: str, token: str = Depends(verify_
 @app.get("/analysis/instances", tags=["Analysis"])
 async def list_instances(sort_by: str = 'prediction', limit: int = 100, token: str = Depends(verify_token)):
     return handle_request(model_service.list_instances, sort_by, limit)
+
+@app.get("/analysis/dataset-comparison", tags=["Analysis"])
+async def get_dataset_comparison(token: str = Depends(verify_token)):
+    return handle_request(model_service.get_dataset_comparison)
 
 # --- New enterprise feature endpoints ---
 @app.get("/api/features", tags=["Features"])
@@ -194,6 +225,38 @@ async def post_pairwise_analysis(payload: Dict = Body(...), token: str = Depends
     color_by = payload.get("color_by")
     sample_size = int(payload.get("sample_size", 1000))
     return handle_request(model_service.pairwise_analysis, f1, f2, color_by, sample_size)
+
+# --- AI Explanation Endpoint ---
+@app.post("/analysis/explain-with-ai", tags=["AI Analysis"])
+async def explain_with_ai(
+    payload: Dict = Body(...),
+    token: str = Depends(verify_token)
+):
+    """
+    Generate an AI-powered explanation of the current analysis results.
+    
+    Expected payload:
+    {
+        "analysis_type": "overview|feature_importance|classification_stats|...",
+        "analysis_data": {...}  # The data to be explained
+    }
+    """
+    try:
+        analysis_type = payload.get("analysis_type")
+        analysis_data = payload.get("analysis_data", {})
+        
+        if not analysis_type:
+            raise HTTPException(status_code=400, detail="Missing 'analysis_type' in payload")
+        
+        # Generate AI explanation
+        explanation = ai_explanation_service.generate_explanation(analysis_data, analysis_type)
+        
+        return JSONResponse(status_code=200, content=explanation)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating AI explanation: {str(e)}")
 
 # --- AI Explanation Endpoint ---
 @app.post("/analysis/explain-with-ai", tags=["AI Analysis"])
