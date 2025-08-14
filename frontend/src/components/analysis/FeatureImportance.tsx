@@ -88,10 +88,27 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
         (async () => {
             try {
                 setImpLoading(true);
+                setError(''); // Clear previous errors
                 const data = await postAdvancedImportance({ method, sort_by: sortBy, top_n: topN, visualization: viz });
                 setImportance(data);
+                
+                // Check if the response contains an error (for SHAP unavailability)
+                if (data.error) {
+                    setError(data.error);
+                    // Auto-fallback to permutation method if SHAP fails
+                    if (method === 'shap' && data.error.includes('SHAP values are not available')) {
+                        setMethod('gain'); // Try builtin first, will fallback to permutation if needed
+                    }
+                }
             } catch (e: any) {
-                setError(e.response?.data?.detail || 'Failed to fetch advanced importance');
+                const errorMsg = e.response?.data?.detail || 'Failed to fetch feature importance';
+                setError(errorMsg);
+                
+                // Auto-fallback for SHAP unavailability
+                if (method === 'shap' && errorMsg.includes('SHAP')) {
+                    setError(errorMsg + ' Automatically switching to builtin method.');
+                    setMethod('gain');
+                }
             } finally {
                 setImpLoading(false);
             }
@@ -203,10 +220,13 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
                     <div>
                         <label className="text-xs text-gray-500">Method</label>
                         <select className="w-full mt-1 px-3 py-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600" value={method} onChange={e => setMethod(e.target.value as any)}>
-                            <option value="shap">SHAP</option>
+                            <option value="shap">SHAP (may not be available for ONNX)</option>
                             <option value="permutation">Permutation</option>
-                            <option value="gain">Gain/Builtin</option>
+                            <option value="gain">Gain/Builtin (sklearn models only)</option>
                         </select>
+                        <p className="text-xs text-gray-400 mt-1">
+                            For ONNX models, try "Permutation" if SHAP is not available
+                        </p>
                     </div>
                     <div>
                         <label className="text-xs text-gray-500">Sort By</label>

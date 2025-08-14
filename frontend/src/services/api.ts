@@ -6,11 +6,25 @@ const apiClient = axios.create({
     baseURL: API_BASE_URL,
 });
 
-// A placeholder for the token. In a real app, this would come from a login process.
+// Token management
+const TOKEN_KEY = 'authToken';
+const DEFAULT_TOKEN = 'test_token';
+
 const getAuthToken = () => {
-    // For now, we'll use a simple placeholder. You can manage this with context/state management later.
-    return localStorage.getItem('authToken') || 'test_token';
+    try {
+        let token = localStorage.getItem(TOKEN_KEY);
+        if (!token) {
+            token = DEFAULT_TOKEN;
+            localStorage.setItem(TOKEN_KEY, token);
+        }
+        return token;
+    } catch (error) {
+        return DEFAULT_TOKEN;
+    }
 };
+
+// Initialize token on module load
+getAuthToken();
 
 apiClient.interceptors.request.use((config) => {
     const token = getAuthToken();
@@ -34,6 +48,19 @@ export const uploadModelAndData = async (modelFile: File, dataFile: File, target
     return response.data;
 };
 
+export const uploadModelAndSeparateDatasets = async (modelFile: File, trainFile: File, testFile: File, targetColumn: string) => {
+    const formData = new FormData();
+    formData.append('model_file', modelFile);
+    formData.append('train_file', trainFile);
+    formData.append('test_file', testFile);
+    formData.append('target_column', targetColumn);
+
+    const response = await apiClient.post('/upload/model-and-separate-datasets', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+};
+
 export const getModelOverview = () => apiClient.get('/analysis/overview').then(res => res.data);
 export const getClassificationStats = () => apiClient.get('/analysis/classification-stats').then(res => res.data);
 export const getFeatureImportance = (method = 'shap') => apiClient.get(`/analysis/feature-importance?method=${method}`).then(res => res.data);
@@ -43,6 +70,7 @@ export const performWhatIf = (features: Record<string, any>) => apiClient.post('
 export const getFeatureDependence = (featureName: string) => apiClient.get(`/analysis/feature-dependence/${featureName}`).then(res => res.data);
 export const getFeatureInteractions = (feature1: string, feature2: string) => apiClient.get(`/analysis/feature-interactions?feature1=${feature1}&feature2=${feature2}`).then(res => res.data);
 export const getDecisionTree = () => apiClient.get('/analysis/decision-tree').then(res => res.data);
+export const getDatasetComparison = () => apiClient.get('/analysis/dataset-comparison').then(res => res.data);
 
 // Enterprise feature APIs
 export const getFeaturesMetadata = () => apiClient.get('/api/features').then(res => res.data);
