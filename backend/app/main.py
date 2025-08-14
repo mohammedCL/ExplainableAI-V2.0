@@ -21,25 +21,25 @@ app.add_middleware(
 
 model_service = ModelService()
 
-# Auto-load model and data on startup
-@app.on_event("startup")
-async def startup_event():
-    try:
-        model_path = os.path.join(settings.STORAGE_DIR, "cancer_model.joblib")
-        data_path = os.path.join(settings.STORAGE_DIR, "breast_cancer_dataset.csv")
-        target_column = "target"
+# # Auto-load model and data on startup
+# @app.on_event("startup")
+# async def startup_event():
+#     try:
+#         model_path = os.path.join(settings.STORAGE_DIR, "cancer_model.joblib")
+#         data_path = os.path.join(settings.STORAGE_DIR, "breast_cancer_dataset.csv")
+#         target_column = "target"
         
-        if os.path.exists(model_path) and os.path.exists(data_path):
-            print(f"Auto-loading model from {model_path}")
-            print(f"Auto-loading data from {data_path}")
-            result = model_service.load_model_and_data(model_path, data_path, target_column)
-            print("✅ Model and data loaded successfully on startup!")
-        else:
-            print("❌ Model or data files not found, waiting for upload...")
-    except Exception as e:
-        print(f"❌ Error auto-loading model: {e}")
-        import traceback
-        traceback.print_exc()
+#         if os.path.exists(model_path) and os.path.exists(data_path):
+#             print(f"Auto-loading model from {model_path}")
+#             print(f"Auto-loading data from {data_path}")
+#             result = model_service.load_model_and_data(model_path, data_path, target_column)
+#             print("✅ Model and data loaded successfully on startup!")
+#         else:
+#             print("❌ Model or data files not found, waiting for upload...")
+#     except Exception as e:
+#         print(f"❌ Error auto-loading model: {e}")
+#         import traceback
+#         traceback.print_exc()
 
 # --- Utility Function for Error Handling ---
 def handle_request(service_func, *args, **kwargs):
