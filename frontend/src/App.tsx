@@ -8,9 +8,7 @@ import WhatIfAnalysis from './components/analysis/WhatIfAnalysis';
 import FeatureDependence from './components/analysis/FeatureDependence';
 import FeatureInteractions from './components/analysis/FeatureInteractions';
 import UploadPage from './components/analysis/UploadPage';
-
-// A placeholder for the Decision Trees component we'll add later
-const DecisionTrees = () => <div className="p-6">Decision Tree visualization coming soon...</div>;
+import DecisionTreesWrapper from './components/analysis/DecisionTreesWrapper';
 
 function App() {
   return (
@@ -27,7 +25,7 @@ function App() {
           <Route path="what-if" element={<WhatIfAnalysis modelType="classification" />} />
           <Route path="feature-dependence" element={<FeatureDependence modelType="classification" />} />
           <Route path="feature-interactions" element={<FeatureInteractions modelType="classification" />} />
-          <Route path="decision-trees" element={<DecisionTrees />} />
+          <Route path="decision-trees" element={<DecisionTreesWrapper />} />
         </Route>
       </Routes>
     </Router>
