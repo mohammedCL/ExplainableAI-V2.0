@@ -930,7 +930,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
             {selectedNode.prediction !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: '600', color: '#374151' }}>Prediction:</span>
-                <span style={{ color: '#6b7280' }}>{selectedNode.prediction.toFixed(16)}</span>
+                <span style={{ color: '#6b7280' }}>{selectedNode.prediction.toFixed(6)}</span>
               </div>
             )}
             
