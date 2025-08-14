@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getClassificationStats, postRocAnalysis, postThresholdAnalysis } from '../../services/api';
 import { AlertCircle, Loader2, PieChart, Target, TrendingUp, CheckCircle } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 const MetricCard = ({ title, value, format, icon, color = "blue" }: {
     title: string;
@@ -39,6 +41,9 @@ const ClassificationStats: React.FC = () => {
     const [error, setError] = useState('');
     const [roc, setRoc] = useState<any>(null);
     const [thr, setThr] = useState<any>(null);
+
+    // AI explanation state
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     // Initial data fetches
     useEffect(() => {
@@ -96,6 +101,10 @@ const ClassificationStats: React.FC = () => {
                             <PieChart className="mr-3 text-blue-600" />
                             Classification Performance
                         </h1>
+                        <ExplainWithAIButton 
+                            onClick={() => setShowAIExplanation(true)}
+                            size="md"
+                        />
                     </div>
 
                     {/* Performance Metrics */}
@@ -284,6 +293,20 @@ const ClassificationStats: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* AI Explanation Panel */}
+                    <AIExplanationPanel
+                        isOpen={showAIExplanation}
+                        onClose={() => setShowAIExplanation(false)}
+                        analysisType="classification_stats"
+                        analysisData={{
+                            metrics,
+                            confusion_matrix,
+                            roc_analysis: roc,
+                            threshold_analysis: thr
+                        }}
+                        title="Classification Performance - AI Explanation"
+                    />
                 </div>
             </div>
         </div>

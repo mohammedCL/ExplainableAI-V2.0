@@ -85,22 +85,22 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
   // Function to calculate node depth and enhanced details
   const calculateNodeDepth = (targetNode: TreeNodeType, currentNode: TreeNodeType, currentDepth: number = 0): number => {
     if (currentNode === targetNode) return currentDepth;
-    
+
     if (currentNode.left) {
       const leftDepth = calculateNodeDepth(targetNode, currentNode.left, currentDepth + 1);
       if (leftDepth !== -1) return leftDepth;
     }
-    
+
     if (currentNode.right) {
       const rightDepth = calculateNodeDepth(targetNode, currentNode.right, currentDepth + 1);
       if (rightDepth !== -1) return rightDepth;
     }
-    
+
     return -1;
   };
 
   // Function to extract decision rules from tree
-  const extractDecisionRules = (node: TreeNodeType, currentPath: string[] = [], allRules: Array<{path: string[], prediction: number, confidence: number, samples: number}> = []): Array<{path: string[], prediction: number, confidence: number, samples: number}> => {
+  const extractDecisionRules = (node: TreeNodeType, currentPath: string[] = [], allRules: Array<{ path: string[], prediction: number, confidence: number, samples: number }> = []): Array<{ path: string[], prediction: number, confidence: number, samples: number }> => {
     if (!node) return allRules;
 
     if (node.type === 'leaf') {
@@ -151,7 +151,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
       return (
         <TreeNode
           label={
-            <div 
+            <div
               className={`leaf-node ${confidenceLevel}-confidence ${isHighlighted ? 'highlighted' : ''}`}
               onClick={() => setSelectedNode(node)}
               style={{ cursor: 'pointer' }}
@@ -187,7 +187,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
     return (
       <TreeNode
         label={
-          <div 
+          <div
             className={`split-node ${isHighlighted ? 'highlighted' : ''}`}
             onClick={() => setSelectedNode(node)}
             style={{ cursor: 'pointer' }}
@@ -243,7 +243,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 className={`control-button ${selectedTreeIndex === index ? '' : 'secondary'}`}
                 onClick={() => setSelectedTreeIndex(index)}
                 style={{
-                  background: selectedTreeIndex === index 
+                  background: selectedTreeIndex === index
                     ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
                     : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
                 }}
@@ -302,7 +302,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 className={`control-button ${viewMode === mode ? '' : 'secondary'}`}
                 onClick={() => setViewMode(mode)}
                 style={{
-                  background: viewMode === mode 
+                  background: viewMode === mode
                     ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
                     : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
                   textTransform: 'capitalize'
@@ -387,10 +387,10 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
               <p style={{ marginBottom: '24px', color: '#6b7280', fontSize: '14px' }}>
                 Compare performance and complexity across different trees in the ensemble
               </p>
-              
+
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ 
-                  width: '100%', 
+                <table style={{
+                  width: '100%',
                   borderCollapse: 'collapse',
                   fontSize: '14px',
                   background: 'white',
@@ -400,52 +400,52 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'left', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'left',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Tree</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Accuracy</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Importance</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Nodes</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Depth</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Leaves</th>
-                      <th style={{ 
-                        padding: '16px 12px', 
-                        textAlign: 'center', 
-                        fontWeight: '600', 
+                      <th style={{
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e2e8f0'
                       }}>Actions</th>
@@ -455,71 +455,71 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                     {trees.map((tree, index) => {
                       const isSelected = selectedTreeIndex === index;
                       return (
-                        <tr 
+                        <tr
                           key={tree.tree_index}
-                          style={{ 
+                          style={{
                             backgroundColor: isSelected ? '#eff6ff' : index % 2 === 0 ? '#ffffff' : '#f9fafb',
                             borderBottom: '1px solid #e2e8f0'
                           }}
                         >
-                          <td style={{ 
+                          <td style={{
                             padding: '16px 12px',
                             fontWeight: isSelected ? '600' : '500',
                             color: isSelected ? '#3b82f6' : '#374151'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ 
-                                width: '8px', 
-                                height: '8px', 
-                                borderRadius: '50%', 
-                                backgroundColor: isSelected ? '#3b82f6' : '#9ca3af' 
+                              <div style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: isSelected ? '#3b82f6' : '#9ca3af'
                               }}></div>
                               Tree {tree.tree_index}
                             </div>
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center',
                             color: '#374151'
                           }}>
-                            <span style={{ 
+                            <span style={{
                               fontWeight: '600',
-                              color: (tree.accuracy || 0.917) >= 0.9 ? '#10b981' : 
-                                     (tree.accuracy || 0.917) >= 0.8 ? '#f59e0b' : '#ef4444'
+                              color: (tree.accuracy || 0.917) >= 0.9 ? '#10b981' :
+                                (tree.accuracy || 0.917) >= 0.8 ? '#f59e0b' : '#ef4444'
                             }}>
                               {((tree.accuracy || 0.917) * 100).toFixed(1)}%
                             </span>
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center',
                             color: '#374151'
                           }}>
                             {((tree.importance || 0.2) * 100).toFixed(1)}%
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center',
                             color: '#374151'
                           }}>
                             {tree.total_nodes || 'N/A'}
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center',
                             color: '#374151'
                           }}>
                             {tree.max_depth || 'N/A'}
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center',
                             color: '#374151'
                           }}>
                             {tree.leaf_nodes || 'N/A'}
                           </td>
-                          <td style={{ 
-                            padding: '16px 12px', 
+                          <td style={{
+                            padding: '16px 12px',
                             textAlign: 'center'
                           }}>
                             <button
@@ -558,17 +558,17 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
               </div>
 
               {/* Summary Statistics */}
-              <div style={{ 
-                marginTop: '32px', 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '16px' 
+              <div style={{
+                marginTop: '32px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px'
               }}>
-                <div style={{ 
-                  padding: '20px', 
-                  backgroundColor: '#f0f9ff', 
-                  borderRadius: '8px', 
-                  border: '1px solid #e0f2fe' 
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#f0f9ff',
+                  borderRadius: '8px',
+                  border: '1px solid #e0f2fe'
                 }}>
                   <div style={{ fontSize: '24px', fontWeight: '700', color: '#0369a1', marginBottom: '4px' }}>
                     {((trees.reduce((sum, tree) => sum + (tree.accuracy || 0.917), 0) / trees.length) * 100).toFixed(1)}%
@@ -577,12 +577,12 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                     Average Accuracy
                   </div>
                 </div>
-                
-                <div style={{ 
-                  padding: '20px', 
-                  backgroundColor: '#f0fdf4', 
-                  borderRadius: '8px', 
-                  border: '1px solid #dcfce7' 
+
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '8px',
+                  border: '1px solid #dcfce7'
                 }}>
                   <div style={{ fontSize: '24px', fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>
                     {Math.max(...trees.map(tree => tree.max_depth || 0))}
@@ -591,12 +591,12 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                     Max Tree Depth
                   </div>
                 </div>
-                
-                <div style={{ 
-                  padding: '20px', 
-                  backgroundColor: '#fffbeb', 
-                  borderRadius: '8px', 
-                  border: '1px solid #fed7aa' 
+
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#fffbeb',
+                  borderRadius: '8px',
+                  border: '1px solid #fed7aa'
                 }}>
                   <div style={{ fontSize: '24px', fontWeight: '700', color: '#c2410c', marginBottom: '4px' }}>
                     {Math.round(trees.reduce((sum, tree) => sum + (tree.total_nodes || 0), 0) / trees.length)}
@@ -605,12 +605,12 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                     Avg Nodes per Tree
                   </div>
                 </div>
-                
-                <div style={{ 
-                  padding: '20px', 
-                  backgroundColor: '#fdf2f8', 
-                  borderRadius: '8px', 
-                  border: '1px solid #fce7f3' 
+
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#fdf2f8',
+                  borderRadius: '8px',
+                  border: '1px solid #fce7f3'
                 }}>
                   <div style={{ fontSize: '24px', fontWeight: '700', color: '#be185d', marginBottom: '4px' }}>
                     {trees.length}
@@ -631,10 +631,10 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
               <p style={{ marginBottom: '24px', color: '#6b7280', fontSize: '14px' }}>
                 All possible paths from root to leaf nodes with their corresponding predictions.
               </p>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {decisionRules.map((rule, index) => (
-                  <div 
+                  <div
                     key={index}
                     style={{
                       padding: '20px',
@@ -657,8 +657,8 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                         Rule {index + 1}
                       </div>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{ 
-                          padding: '4px 8px', 
+                        <div style={{
+                          padding: '4px 8px',
                           backgroundColor: rule.confidence >= 0.8 ? '#dcfce7' : rule.confidence >= 0.6 ? '#fef3c7' : '#fee2e2',
                           color: rule.confidence >= 0.8 ? '#166534' : rule.confidence >= 0.6 ? '#92400e' : '#991b1b',
                           borderRadius: '4px',
@@ -667,8 +667,8 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                         }}>
                           {(rule.confidence * 100).toFixed(1)}% confidence
                         </div>
-                        <div style={{ 
-                          fontSize: '14px', 
+                        <div style={{
+                          fontSize: '14px',
                           color: '#6b7280',
                           fontWeight: '500'
                         }}>
@@ -676,7 +676,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div style={{ marginBottom: '12px' }}>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                         Conditions:
@@ -684,14 +684,14 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                       {rule.path.length > 0 ? (
                         <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
                           {rule.path.map((condition, condIndex) => (
-                            <div key={condIndex} style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
+                            <div key={condIndex} style={{
+                              display: 'flex',
+                              alignItems: 'center',
                               marginBottom: '4px',
                               color: '#4b5563'
                             }}>
-                              <span style={{ 
-                                marginRight: '8px', 
+                              <span style={{
+                                marginRight: '8px',
                                 fontWeight: '600',
                                 color: '#6b7280',
                                 minWidth: '20px'
@@ -705,8 +705,8 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                           ))}
                         </div>
                       ) : (
-                        <div style={{ 
-                          fontSize: '14px', 
+                        <div style={{
+                          fontSize: '14px',
                           color: '#6b7280',
                           fontStyle: 'italic'
                         }}>
@@ -714,9 +714,9 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                         </div>
                       )}
                     </div>
-                    
-                    <div style={{ 
-                      borderTop: '1px solid #e2e8f0', 
+
+                    <div style={{
+                      borderTop: '1px solid #e2e8f0',
                       paddingTop: '12px',
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -726,8 +726,8 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                         <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>
                           Prediction:
                         </span>
-                        <span style={{ 
-                          fontSize: '14px', 
+                        <span style={{
+                          fontSize: '14px',
                           marginLeft: '8px',
                           fontWeight: '600',
                           color: rule.prediction > 0.5 ? '#059669' : '#dc2626',
@@ -736,9 +736,9 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                           {rule.prediction.toFixed(6)} ({rule.prediction > 0.5 ? 'Positive' : 'Negative'})
                         </span>
                       </div>
-                      
-                      <div style={{ 
-                        fontSize: '12px', 
+
+                      <div style={{
+                        fontSize: '12px',
                         color: '#6b7280',
                         textAlign: 'right'
                       }}>
@@ -748,10 +748,10 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                   </div>
                 ))}
               </div>
-              
+
               {decisionRules.length === 0 && (
-                <div style={{ 
-                  textAlign: 'center', 
+                <div style={{
+                  textAlign: 'center',
                   padding: '40px',
                   color: '#6b7280',
                   fontSize: '14px'
@@ -759,10 +759,10 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                   No decision rules found. The tree structure may be incomplete.
                 </div>
               )}
-              
+
               {/* Rules Summary */}
               {decisionRules.length > 0 && (
-                <div style={{ 
+                <div style={{
                   marginTop: '32px',
                   padding: '20px',
                   backgroundColor: '#f8fafc',
@@ -888,20 +888,20 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
               ×
             </button>
           </div>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
             {/* Type */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: '600', color: '#374151' }}>Type:</span>
               <span style={{ color: '#6b7280' }}>{selectedNode.type}</span>
             </div>
-            
+
             {/* Samples */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: '600', color: '#374151' }}>Samples:</span>
               <span style={{ color: '#6b7280' }}>{selectedNode.samples}</span>
             </div>
-            
+
             {/* Depth */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: '600', color: '#374151' }}>Depth:</span>
@@ -909,7 +909,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 {calculateNodeDepth(selectedNode, currentTree.tree_structure)}
               </span>
             </div>
-            
+
             {/* Feature (for split nodes) */}
             {selectedNode.feature && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -917,7 +917,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>{formatFeatureName(selectedNode.feature)}</span>
               </div>
             )}
-            
+
             {/* Threshold (for split nodes) */}
             {selectedNode.threshold !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -925,7 +925,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>≤ {selectedNode.threshold.toFixed(4)}</span>
               </div>
             )}
-            
+
             {/* Prediction (for leaf nodes) */}
             {selectedNode.prediction !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -933,7 +933,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>{selectedNode.prediction.toFixed(6)}</span>
               </div>
             )}
-            
+
             {/* Confidence */}
             {selectedNode.confidence !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -941,7 +941,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>{(selectedNode.confidence * 100).toFixed(1)}%</span>
               </div>
             )}
-            
+
             {/* Purity */}
             {selectedNode.purity !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -949,7 +949,7 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>{(selectedNode.purity * 100).toFixed(1)}%</span>
               </div>
             )}
-            
+
             {/* Gini Impurity */}
             {selectedNode.gini !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -957,22 +957,22 @@ const DecisionTrees: React.FC<DecisionTreesProps> = ({ trees }) => {
                 <span style={{ color: '#6b7280' }}>{selectedNode.gini.toFixed(4)}</span>
               </div>
             )}
-            
+
             {/* Class Distribution */}
             {selectedNode.class_distribution && Object.keys(selectedNode.class_distribution).length > 0 && (
               <div style={{ marginTop: '16px' }}>
                 <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                   Class Distribution:
                 </div>
-                <div style={{ 
-                  backgroundColor: '#f8fafc', 
-                  padding: '12px', 
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '12px',
                   borderRadius: '6px',
                   border: '1px solid #e2e8f0'
                 }}>
                   {Object.entries(selectedNode.class_distribution).map(([className, count], index) => (
-                    <div key={index} style={{ 
-                      display: 'flex', 
+                    <div key={index} style={{
+                      display: 'flex',
                       justifyContent: 'space-between',
                       marginBottom: index < Object.entries(selectedNode.class_distribution!).length - 1 ? '8px' : '0'
                     }}>

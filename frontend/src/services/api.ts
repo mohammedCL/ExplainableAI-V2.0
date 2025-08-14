@@ -64,3 +64,6 @@ export const postIcePlot = (feature: string, num_points = 20, num_instances = 20
 // Section 5 - Interactions
 export const postInteractionNetwork = (top_k = 30, sample_rows = 200) => apiClient.post('/api/interaction-network', { top_k, sample_rows }).then(res => res.data);
 export const postPairwiseAnalysis = (feature1: string, feature2: string, color_by?: string, sample_size = 1000) => apiClient.post('/api/pairwise-analysis', { feature1, feature2, color_by, sample_size }).then(res => res.data);
+
+// AI Explanation API
+export const explainWithAI = (analysisType: string, analysisData: any) => apiClient.post('/analysis/explain-with-ai', { analysis_type: analysisType, analysis_data: analysisData }).then(res => res.data);

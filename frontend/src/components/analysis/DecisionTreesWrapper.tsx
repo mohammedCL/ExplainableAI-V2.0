@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import DecisionTrees from './DecisionTrees';
 import { getDecisionTree } from '../../services/api';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 type TreeNodeType = {
   type: 'split' | 'leaf';
@@ -31,6 +33,7 @@ const DecisionTreesWrapper: React.FC = () => {
   const [treesData, setTreesData] = useState<TreeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAIExplanation, setShowAIExplanation] = useState(false);
 
   useEffect(() => {
     const fetchTreesData = async () => {
@@ -54,7 +57,7 @@ const DecisionTreesWrapper: React.FC = () => {
         console.error('Error fetching decision tree data:', err);
         const errorMessage = err.response?.data?.detail || 'Failed to fetch decision tree data.';
         setError(errorMessage);
-        
+
         // Only use mock data if it's a connection error or if the backend is not available
         if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network Error')) {
           console.log('Using mock data due to API connection error...');
@@ -124,7 +127,7 @@ const DecisionTreesWrapper: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchTreesData();
   }, []);
 
@@ -153,7 +156,26 @@ const DecisionTreesWrapper: React.FC = () => {
     );
   }
 
-  return <DecisionTrees trees={treesData} />;
+  return (
+    <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Decision Trees</h1>
+        <ExplainWithAIButton onClick={() => setShowAIExplanation(true)} size="md" />
+      </div>
+
+      <DecisionTrees trees={treesData} />
+
+      <AIExplanationPanel
+        isOpen={showAIExplanation}
+        onClose={() => setShowAIExplanation(false)}
+        analysisType="decision_tree"
+        analysisData={{
+          trees: treesData
+        }}
+        title="Decision Trees - AI Explanation"
+      />
+    </div>
+  );
 };
 
 export default DecisionTreesWrapper;

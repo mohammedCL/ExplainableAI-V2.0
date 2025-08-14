@@ -14,6 +14,8 @@ import {
 } from 'recharts';
 import { getFeaturesMetadata, postCorrelation, postAdvancedImportance } from '../../services/api';
 import { AlertCircle, Loader2, BarChart3, Eye, EyeOff, Info } from 'lucide-react';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 type FeatureMeta = { name: string; type: 'numeric' | 'categorical'; description?: string; min_value?: number; max_value?: number; categories?: string[] };
 
@@ -39,6 +41,9 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
     const [topN, setTopN] = useState(10);
     const [impLoading, setImpLoading] = useState(false);
     const [importance, setImportance] = useState<any>(null);
+
+    // AI explanation state
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     // fetch feature metadata
     useEffect(() => {
@@ -117,9 +122,15 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
                     <BarChart3 className="mr-3 text-blue-600" />
                     Feature Importance
                 </h1>
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <Info className="w-4 h-4" />
-                    <span>Interactive analysis</span>
+                <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <Info className="w-4 h-4" />
+                        <span>Interactive analysis</span>
+                    </div>
+                    <ExplainWithAIButton 
+                        onClick={() => setShowAIExplanation(true)}
+                        size="md"
+                    />
                 </div>
             </div>
 
@@ -291,6 +302,20 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
                     <span>{error}</span>
                 </div>
             )}
+
+            {/* AI Explanation Panel */}
+            <AIExplanationPanel
+                isOpen={showAIExplanation}
+                onClose={() => setShowAIExplanation(false)}
+                analysisType="feature_importance"
+                analysisData={{
+                    featuresMeta,
+                    importance,
+                    correlation: corr,
+                    controls: { viz, method, sortBy, topN }
+                }}
+                title="Feature Importance - AI Explanation"
+            />
         </div>
     );
 };

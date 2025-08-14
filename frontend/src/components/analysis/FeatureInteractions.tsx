@@ -4,6 +4,8 @@ import { getModelOverview, postInteractionNetwork, postPairwiseAnalysis } from '
 import Plot from 'react-plotly.js';
 // @ts-ignore - types are provided by package at runtime
 import ForceGraph2D from 'react-force-graph-2d';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 // Removed legacy heatmap demo
 
@@ -106,6 +108,7 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
     const [pairData, setPairData] = useState<any>(null);
     const [active, setActive] = useState<'heatmap' | 'network' | 'pairwise'>('heatmap');
     const [searchText, setSearchText] = useState('');
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -147,7 +150,10 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
         <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold">Feature Interactions</h1>
-                <p className="text-sm text-gray-500">Discover how features interact with each other to influence predictions</p>
+                <div className="flex items-center space-x-4">
+                    <p className="text-sm text-gray-500">Discover how features interact with each other to influence predictions</p>
+                    <ExplainWithAIButton onClick={() => setShowAIExplanation(true)} size="md" />
+                </div>
             </div>
 
             <div className="flex space-x-2">
@@ -319,6 +325,20 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                     )}
                 </div>
             )}
+            <AIExplanationPanel
+                isOpen={showAIExplanation}
+                onClose={() => setShowAIExplanation(false)}
+                analysisType="feature_interactions"
+                analysisData={{
+                    minStrength,
+                    network,
+                    active,
+                    pair,
+                    pairData,
+                    searchText
+                }}
+                title="Feature Interactions - AI Explanation"
+            />
         </div>
     );
 }; export default FeatureInteractions;

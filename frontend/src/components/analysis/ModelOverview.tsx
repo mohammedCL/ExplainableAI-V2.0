@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getModelOverview } from '../../services/api';
 import { Target, AlertCircle, Info, Loader2 } from 'lucide-react';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 const MetricCard = ({ title, value, format, icon }: { title: string; value: number; format: 'percentage' | 'number'; icon: React.ReactNode }) => (
     <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -20,6 +22,7 @@ const ModelOverview: React.FC<{ modelType: string }> = () => {
     const [overview, setOverview] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     useEffect(() => {
         const fetchOverview = async () => {
@@ -50,8 +53,25 @@ const ModelOverview: React.FC<{ modelType: string }> = () => {
 
     return (
         <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
-            <h1 className="text-3xl font-bold">Model Overview</h1>
+            {/* Header with Explain with AI button */}
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold">Model Overview</h1>
+                <ExplainWithAIButton 
+                    onClick={() => setShowAIExplanation(true)}
+                    size="md"
+                />
+            </div>
 
+            {/* AI Explanation Panel */}
+            <AIExplanationPanel
+                isOpen={showAIExplanation}
+                onClose={() => setShowAIExplanation(false)}
+                analysisType="overview"
+                analysisData={overview}
+                title="Model Overview - AI Explanation"
+            />
+
+            {/* Rest of the existing content */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 <MetricCard title="Accuracy" value={metrics.accuracy} format="percentage" icon={<Target className="w-6 h-6 text-blue-600" />} />
                 <MetricCard title="Precision" value={metrics.precision} format="percentage" icon={<Target className="w-6 h-6 text-blue-600" />} />

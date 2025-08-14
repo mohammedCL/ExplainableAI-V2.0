@@ -6,8 +6,9 @@ from typing import Dict
 from typing import List
 
 from app.core.config import settings
-from core.auth import verify_token
-from services.model_service import ModelService
+from app.core.auth import verify_token
+from app.services.model_service import ModelService
+from app.services.ai_explanation_service import AIExplanationService
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 
 model_service = ModelService()
+ai_explanation_service = AIExplanationService()
 
 # # Auto-load model and data on startup
 # @app.on_event("startup")
@@ -192,3 +194,35 @@ async def post_pairwise_analysis(payload: Dict = Body(...), token: str = Depends
     color_by = payload.get("color_by")
     sample_size = int(payload.get("sample_size", 1000))
     return handle_request(model_service.pairwise_analysis, f1, f2, color_by, sample_size)
+
+# --- AI Explanation Endpoint ---
+@app.post("/analysis/explain-with-ai", tags=["AI Analysis"])
+async def explain_with_ai(
+    payload: Dict = Body(...),
+    token: str = Depends(verify_token)
+):
+    """
+    Generate an AI-powered explanation of the current analysis results.
+    
+    Expected payload:
+    {
+        "analysis_type": "overview|feature_importance|classification_stats|...",
+        "analysis_data": {...}  # The data to be explained
+    }
+    """
+    try:
+        analysis_type = payload.get("analysis_type")
+        analysis_data = payload.get("analysis_data", {})
+        
+        if not analysis_type:
+            raise HTTPException(status_code=400, detail="Missing 'analysis_type' in payload")
+        
+        # Generate AI explanation
+        explanation = ai_explanation_service.generate_explanation(analysis_data, analysis_type)
+        
+        return JSONResponse(status_code=200, content=explanation)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating AI explanation: {str(e)}")

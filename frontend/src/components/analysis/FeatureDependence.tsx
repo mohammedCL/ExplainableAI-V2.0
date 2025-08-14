@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, Search, BarChart3, Settings, AlertCircle, Loader2 } from 'lucide-react';
 import { getModelOverview, postPartialDependence, postShapDependence, postIcePlot } from '../../services/api';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 const FeatureCard = ({ name, description, percentage, isSelected, onClick }: {
     name: string;
@@ -140,6 +142,7 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
     const [ice, setIce] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     useEffect(() => {
         // load features from overview
@@ -180,112 +183,131 @@ const FeatureDependence: React.FC<{ modelType?: string }> = () => {
     const filteredFeatures = featureList.filter(f => f.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 w-full">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">Feature Dependence</h1>
-                <p className="text-sm text-gray-500">Explore how individual features affect model predictions across their value ranges</p>
-            </div>
-
-            <div className="flex space-x-2">
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center space-x-2">
-                    <Settings className="w-4 h-4" />
-                    <span>Settings</span>
-                </button>
-                <button className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                    Export
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Feature Selection */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4">Select Feature</h2>
-
-                    <div className="relative mb-4">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search features..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
-                        />
-                    </div>
-
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {filteredFeatures.map((feature) => (
-                            <FeatureCard
-                                key={feature}
-                                name={feature}
-                                description={''}
-                                percentage={''}
-                                isSelected={selectedFeature === feature}
-                                onClick={() => setSelectedFeature(feature)}
-                            />
-                        ))}
+        <>
+            <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 w-full">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-3xl font-bold">Feature Dependence</h1>
+                    <div className="flex items-center space-x-4">
+                        <p className="text-sm text-gray-500">Explore how individual features affect model predictions across their value ranges</p>
+                        <ExplainWithAIButton onClick={() => setShowAIExplanation(true)} size="md" />
                     </div>
                 </div>
 
-                {/* Plot Display */}
-                <div className="lg:col-span-2">
-                    {loading && (
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-72 flex items-center justify-center">
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                        </div>
-                    )}
-                    {error && !loading && (
-                        <div className="p-4 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center">
-                            <AlertCircle className="mr-2 flex-shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
-                    {!loading && plotType === 'partial' && pdp && (
-                        <PDPPlot y={pdp.y} feature={selectedFeature} />
-                    )}
-                    {!loading && plotType === 'shap' && shapDep && (
-                        <SHAPDependencePlot feature_values={shapDep.feature_values} shap_values={shapDep.shap_values} />
-                    )}
-                    {!loading && plotType === 'ice' && ice && (
-                        <ICEPlot curves={ice.curves} feature={selectedFeature} />
-                    )}
+                <div className="flex space-x-2">
+                    <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center space-x-2">
+                        <Settings className="w-4 h-4" />
+                        <span>Settings</span>
+                    </button>
+                    <button className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                        Export
+                    </button>
                 </div>
-            </div>
 
-            {/* Feature Impact Panel based on PDP */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PlotTypeSelector selectedType={plotType} onTypeChange={setPlotType} />
-                {pdp && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Feature Selection */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 text-purple-600" />Feature Impact Analysis</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
-                                <div className="text-xs text-gray-500">Type</div>
-                                <div className="text-sm font-semibold">{pdp.impact.feature_type}</div>
-                            </div>
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
-                                <div className="text-xs text-gray-500">Importance</div>
-                                <div className="text-sm font-semibold">{pdp.impact.importance_percentage.toFixed(1)}%</div>
-                            </div>
-                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
-                                <div className="text-xs text-gray-500">Effect Range</div>
-                                <div className="text-sm font-semibold">{pdp.impact.effect_range.toFixed(3)}</div>
-                            </div>
-                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
-                                <div className="text-xs text-gray-500">Trend</div>
-                                <div className="text-sm font-semibold">{pdp.impact.trend_analysis.direction}</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                                <div className="text-xs text-gray-500">Confidence</div>
-                                <div className="text-sm font-semibold">{pdp.impact.confidence_score}%</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                                <div className="text-xs text-gray-500">Summary</div>
-                                <div className="text-sm">{pdp.impact.impact_summary}</div>
-                            </div>
+                        <h2 className="text-lg font-semibold mb-4">Select Feature</h2>
+
+                        <div className="relative mb-4">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search features..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border rounded-md bg-white dark:bg-gray-700 dark:border-gray-600"
+                            />
+                        </div>
+
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                            {filteredFeatures.map((feature) => (
+                                <FeatureCard
+                                    key={feature}
+                                    name={feature}
+                                    description={''}
+                                    percentage={''}
+                                    isSelected={selectedFeature === feature}
+                                    onClick={() => setSelectedFeature(feature)}
+                                />
+                            ))}
                         </div>
                     </div>
-                )}
+
+                    {/* Plot Display */}
+                    <div className="lg:col-span-2">
+                        {loading && (
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-72 flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                            </div>
+                        )}
+                        {error && !loading && (
+                            <div className="p-4 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center">
+                                <AlertCircle className="mr-2 flex-shrink-0" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+                        {!loading && plotType === 'partial' && pdp && (
+                            <PDPPlot y={pdp.y} feature={selectedFeature} />
+                        )}
+                        {!loading && plotType === 'shap' && shapDep && (
+                            <SHAPDependencePlot feature_values={shapDep.feature_values} shap_values={shapDep.shap_values} />
+                        )}
+                        {!loading && plotType === 'ice' && ice && (
+                            <ICEPlot curves={ice.curves} feature={selectedFeature} />
+                        )}
+                    </div>
+                </div>
+
+                {/* Feature Impact Panel based on PDP */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <PlotTypeSelector selectedType={plotType} onTypeChange={setPlotType} />
+                    {pdp && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 text-purple-600" />Feature Impact Analysis</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                    <div className="text-xs text-gray-500">Type</div>
+                                    <div className="text-sm font-semibold">{pdp.impact.feature_type}</div>
+                                </div>
+                                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                                    <div className="text-xs text-gray-500">Importance</div>
+                                    <div className="text-sm font-semibold">{pdp.impact.importance_percentage.toFixed(1)}%</div>
+                                </div>
+                                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
+                                    <div className="text-xs text-gray-500">Effect Range</div>
+                                    <div className="text-sm font-semibold">{pdp.impact.effect_range.toFixed(3)}</div>
+                                </div>
+                                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
+                                    <div className="text-xs text-gray-500">Trend</div>
+                                    <div className="text-sm font-semibold">{pdp.impact.trend_analysis.direction}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                    <div className="text-xs text-gray-500">Confidence</div>
+                                    <div className="text-sm font-semibold">{pdp.impact.confidence_score}%</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                    <div className="text-xs text-gray-500">Summary</div>
+                                    <div className="text-sm">{pdp.impact.impact_summary}</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {/* AI Explanation Panel */}
+                <AIExplanationPanel
+                    isOpen={showAIExplanation}
+                    onClose={() => setShowAIExplanation(false)}
+                    analysisType="feature_dependence"
+                    analysisData={{
+                        selectedFeature,
+                        plotType,
+                        pdp,
+                        shapDep,
+                        ice
+                    }}
+                    title="Feature Dependence - AI Explanation"
+                />
             </div>
-        </div>
+        </>
     );
 }; export default FeatureDependence;
