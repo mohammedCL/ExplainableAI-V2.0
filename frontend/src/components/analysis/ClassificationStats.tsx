@@ -5,34 +5,50 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import ExplainWithAIButton from '../common/ExplainWithAIButton';
 import AIExplanationPanel from '../common/AIExplanationPanel';
 
+// Helper function to safely format numbers
+const safeNumber = (value: number | undefined | null, fallback: number = 0): number => {
+    if (value === undefined || value === null || isNaN(value) || !isFinite(value)) {
+        return fallback;
+    }
+    return value;
+};
+
 const MetricCard = ({ title, value, format, icon, color = "blue" }: {
     title: string;
     value: number;
     format: 'percentage' | 'number';
     icon: React.ReactNode;
     color?: string;
-}) => (
-    <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-l-4 border-blue-500">
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {format === 'percentage' ? `${(value * 100).toFixed(1)}%` : value.toFixed(3)}
-                </p>
-            </div>
-            <div className={`p-3 bg-${color}-100 dark:bg-${color}-900/50 rounded-full`}>
-                {icon}
+}) => {
+    const safeValue = isNaN(value) || !isFinite(value) ? 0 : value;
+    
+    return (
+        <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {format === 'percentage' ? `${(safeValue * 100).toFixed(1)}%` : safeValue.toFixed(3)}
+                    </p>
+                </div>
+                <div className={`p-3 bg-${color}-100 dark:bg-${color}-900/50 rounded-full`}>
+                    {icon}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
-const ConfusionMatrixCell = ({ label, value, isCorrect }: { label: string; value: number; isCorrect: boolean }) => (
-    <div className={`p-4 rounded-lg text-center ${isCorrect ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-        <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</div>
-        <div className="text-2xl font-bold">{value}</div>
-    </div>
-);
+const ConfusionMatrixCell = ({ label, value, isCorrect }: { label: string; value: number; isCorrect: boolean }) => {
+    const safeValue = isNaN(value) || !isFinite(value) ? 0 : Math.round(value);
+    
+    return (
+        <div className={`p-4 rounded-lg text-center ${isCorrect ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</div>
+            <div className="text-2xl font-bold">{safeValue}</div>
+        </div>
+    );
+};
 
 const ClassificationStats: React.FC = () => {
     // Place ALL hooks at top-level and in consistent order across renders
@@ -76,8 +92,15 @@ const ClassificationStats: React.FC = () => {
     const confusion_matrix = (stats?.confusion_matrix ?? { true_negative: 0, false_positive: 0, false_negative: 0, true_positive: 0 });
 
     const rocData = useMemo(() => {
-        if (!roc) return [] as any[];
-        return roc.roc_curve.fpr.map((f: number, i: number) => ({ fpr: f, tpr: roc.roc_curve.tpr[i] }));
+        if (!roc || !roc.roc_curve || !roc.roc_curve.fpr || !roc.roc_curve.tpr) return [] as any[];
+        
+        // Ensure arrays have same length and contain valid numbers
+        const fpr = roc.roc_curve.fpr.filter((val: any) => typeof val === 'number' && isFinite(val));
+        const tpr = roc.roc_curve.tpr.filter((val: any) => typeof val === 'number' && isFinite(val));
+        
+        if (fpr.length !== tpr.length || fpr.length === 0) return [] as any[];
+        
+        return fpr.map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] }));
     }, [roc]);
     const diagData = useMemo(() => ([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }]), []);
 
@@ -218,15 +241,21 @@ const ClassificationStats: React.FC = () => {
                             <div className="space-y-3">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
                                     <div className="text-xs text-gray-500">AUC Score</div>
-                                    <div className="text-2xl font-bold text-blue-600">{(roc?.metrics?.auc_score ?? metrics.auc).toFixed(3)}</div>
+                                    <div className="text-2xl font-bold text-blue-600">
+                                        {safeNumber(roc?.metrics?.auc_score ?? metrics.auc, 0).toFixed(3)}
+                                    </div>
                                 </div>
                                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded">
                                     <div className="text-xs text-gray-500">Optimal Threshold</div>
-                                    <div className="text-2xl font-bold text-purple-600">{(roc?.metrics?.optimal_threshold ?? 0.5).toFixed(2)}</div>
+                                    <div className="text-2xl font-bold text-purple-600">
+                                        {safeNumber(roc?.metrics?.optimal_threshold, 0.5).toFixed(2)}
+                                    </div>
                                 </div>
                                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded">
                                     <div className="text-xs text-gray-500">Sensitivity at Optimal</div>
-                                    <div className="text-2xl font-bold text-green-600">{(roc?.metrics?.sensitivity ?? metrics.recall).toFixed(2)}</div>
+                                    <div className="text-2xl font-bold text-green-600">
+                                        {safeNumber(roc?.metrics?.sensitivity ?? metrics.recall, 0).toFixed(2)}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -241,20 +270,20 @@ const ClassificationStats: React.FC = () => {
                                 <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                     <span className="text-sm font-medium">Total Samples</span>
                                     <span className="font-bold">
-                                        {confusion_matrix.true_positive + confusion_matrix.true_negative +
-                                            confusion_matrix.false_positive + confusion_matrix.false_negative}
+                                        {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0) +
+                                            safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                     <span className="text-sm font-medium">Correct Predictions</span>
                                     <span className="font-bold text-green-600">
-                                        {confusion_matrix.true_positive + confusion_matrix.true_negative}
+                                        {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                                     <span className="text-sm font-medium">Incorrect Predictions</span>
                                     <span className="font-bold text-red-600">
-                                        {confusion_matrix.false_positive + confusion_matrix.false_negative}
+                                        {safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">

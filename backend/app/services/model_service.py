@@ -507,8 +507,8 @@ class ModelService:
         self._is_ready()
         
         # Calculate performance metrics on training data
-        y_pred_train = self.model.predict(self.X_train)
-        y_proba_train = self.model.predict_proba(self.X_train)
+        y_pred_train = self.model.predict(self.X_train.values)
+        y_proba_train = self.model.predict_proba(self.X_train.values)
         
         train_metrics, is_binary = self._get_classification_metrics(
             self.y_train, y_pred_train, y_proba_train
@@ -518,8 +518,8 @@ class ModelService:
         test_metrics = None
         overfitting_score = 0.0
         if self.X_test is not None and self.y_test is not None:
-            y_pred_test = self.model.predict(self.X_test)
-            y_proba_test = self.model.predict_proba(self.X_test)
+            y_pred_test = self.model.predict(self.X_test.values)
+            y_proba_test = self.model.predict_proba(self.X_test.values)
             
             test_metrics, _ = self._get_classification_metrics(
                 self.y_test, y_pred_test, y_proba_test
@@ -595,8 +595,8 @@ class ModelService:
             y_eval = self.y_train
             data_source = "train"
             
-        y_pred = self.model.predict(X_eval)
-        y_proba = self.model.predict_proba(X_eval)
+        y_pred = self.model.predict(X_eval.values)
+        y_proba = self.model.predict_proba(X_eval.values)
         
         metrics, is_binary = self._get_classification_metrics(y_eval, y_pred, y_proba)
         
@@ -851,7 +851,8 @@ class ModelService:
 
         # Create single-row DataFrame for prediction to maintain feature names
         instance_df = pd.DataFrame([instance_data], columns=self.feature_names)
-        prediction_prob = float(self.model.predict_proba(instance_df)[0, 1])
+        # Use .values to avoid feature name warnings
+        prediction_prob = float(self.model.predict_proba(instance_df.values)[0, 1])
 
         # Prepare both mapping and ordered arrays for convenience on the frontend
         shap_mapping = dict(zip(self.feature_names, shap_vals_for_instance))
@@ -960,7 +961,8 @@ class ModelService:
         self._is_ready()
         try:
             input_df = pd.DataFrame([features], columns=self.feature_names)
-            prediction_proba = self.model.predict_proba(input_df)
+            # Use .values to avoid feature name warnings
+            prediction_proba = self.model.predict_proba(input_df.values)
             
             # Handle both binary and multiclass cases
             if prediction_proba.shape[1] == 2:

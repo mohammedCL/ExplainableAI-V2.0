@@ -6,9 +6,8 @@ from typing import Dict
 from typing import List
 
 from app.core.config import settings
-from app.app.core.auth import verify_token
-from app.app.services.model_service import ModelService
-from app.services.ai_explanation_service import AIExplanationService
+from app.core.auth import verify_token
+from app.services.model_service import ModelService
 from app.services.ai_explanation_service import AIExplanationService
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
@@ -23,27 +22,10 @@ app.add_middleware(
 
 model_service = ModelService()
 ai_explanation_service = AIExplanationService()
-ai_explanation_service = AIExplanationService()
 
-# # Auto-load model and data on startup
-# @app.on_event("startup")
-# async def startup_event():
-#     try:
-#         model_path = os.path.join(settings.STORAGE_DIR, "cancer_model.joblib")
-#         data_path = os.path.join(settings.STORAGE_DIR, "breast_cancer_dataset.csv")
-#         target_column = "target"
-        
-#         if os.path.exists(model_path) and os.path.exists(data_path):
-#             print(f"Auto-loading model from {model_path}")
-#             print(f"Auto-loading data from {data_path}")
-#             result = model_service.load_model_and_data(model_path, data_path, target_column)
-#             print("✅ Model and data loaded successfully on startup!")
-#         else:
-#             print("❌ Model or data files not found, waiting for upload...")
-#     except Exception as e:
-#         print(f"❌ Error auto-loading model: {e}")
-#         import traceback
-#         traceback.print_exc()
+
+# Auto-load functionality disabled as requested by user
+# User will upload model and dataset through the frontend interface
 
 # --- Utility Function for Error Handling ---
 def handle_request(service_func, *args, **kwargs):
@@ -225,38 +207,6 @@ async def post_pairwise_analysis(payload: Dict = Body(...), token: str = Depends
     color_by = payload.get("color_by")
     sample_size = int(payload.get("sample_size", 1000))
     return handle_request(model_service.pairwise_analysis, f1, f2, color_by, sample_size)
-
-# --- AI Explanation Endpoint ---
-@app.post("/analysis/explain-with-ai", tags=["AI Analysis"])
-async def explain_with_ai(
-    payload: Dict = Body(...),
-    token: str = Depends(verify_token)
-):
-    """
-    Generate an AI-powered explanation of the current analysis results.
-    
-    Expected payload:
-    {
-        "analysis_type": "overview|feature_importance|classification_stats|...",
-        "analysis_data": {...}  # The data to be explained
-    }
-    """
-    try:
-        analysis_type = payload.get("analysis_type")
-        analysis_data = payload.get("analysis_data", {})
-        
-        if not analysis_type:
-            raise HTTPException(status_code=400, detail="Missing 'analysis_type' in payload")
-        
-        # Generate AI explanation
-        explanation = ai_explanation_service.generate_explanation(analysis_data, analysis_type)
-        
-        return JSONResponse(status_code=200, content=explanation)
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error generating AI explanation: {str(e)}")
 
 # --- AI Explanation Endpoint ---
 @app.post("/analysis/explain-with-ai", tags=["AI Analysis"])
