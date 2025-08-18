@@ -148,7 +148,6 @@ All endpoints require a token parameter. For development, use `token=dev_token`.
 
 ### Model Formats
 - **scikit-learn**: `.joblib`, `.pkl`, `.pickle` files
-- **ONNX**: `.onnx` files (classification models)
 
 ### Model Types
 - **Binary Classification**: Logistic Regression, Random Forest, SVM, XGBoost, etc.
@@ -249,7 +248,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Common Issues
 - **SHAP Errors**: Ensure your model is compatible with SHAP explainers
 - **Memory Issues**: Use smaller datasets or sample sizes for large models
-- **ONNX Support**: Verify ONNX model format and input requirements
 - **AWS Credentials**: Set up proper AWS credentials for AI explanations
 
 ### Documentation
