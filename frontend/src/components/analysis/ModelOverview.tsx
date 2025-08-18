@@ -11,7 +11,10 @@ const MetricCard = ({ title, value, format, icon }: { title: string; value: numb
             <div className="ml-4">
                 <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {format === 'percentage' ? `${(value * 100).toFixed(1)}%` : value.toFixed(3)}
+                    {value !== undefined && value !== null 
+                        ? (format === 'percentage' ? `${(value * 100).toFixed(1)}%` : value.toFixed(3))
+                        : 'N/A'
+                    }
                 </p>
             </div>
         </div>
@@ -49,7 +52,8 @@ const ModelOverview: React.FC<{ modelType: string }> = () => {
         return <div className="p-6">No overview data available.</div>;
     }
 
-    const { performance_metrics: metrics } = overview;
+    const { performance_metrics } = overview;
+    const metrics = performance_metrics?.test || {};
 
     return (
         <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
@@ -89,6 +93,17 @@ const ModelOverview: React.FC<{ modelType: string }> = () => {
                             <li><strong>Algorithm:</strong> {overview.algorithm || 'N/A'}</li>
                             <li><strong>Version:</strong> {overview.version}</li>
                             <li><strong>Framework:</strong> {overview.framework}</li>
+                            <li><strong>Model Type:</strong> {overview.model_type || 'N/A'}</li>
+                            <li>
+                                <strong>SHAP Support:</strong> 
+                                <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                                    overview.shap_available 
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                }`}>
+                                    {overview.shap_available ? 'Available' : 'Limited'}
+                                </span>
+                            </li>
                         </ul>
                     </div>
                     <div>
