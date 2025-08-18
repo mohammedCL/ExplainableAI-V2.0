@@ -13,7 +13,6 @@ ExplainableAI provides an intuitive interface for data scientists and machine le
 - **Get AI-powered explanations** using AWS Bedrock (Claude 3 Sonnet)
 - **Analyze model performance** with ROC curves, confusion matrices, and threshold analysis
 - **Explore feature dependencies** with partial dependence plots and SHAP dependence plots
-- **Detect data drift** between training and test datasets
 
 ## 🏗️ Architecture
 
