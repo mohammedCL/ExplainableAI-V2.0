@@ -211,26 +211,23 @@ class ModelService:
             if target_column not in df.columns:
                 raise ValueError(f"Target column '{target_column}' not found in the dataset.")
 
-            print(f"Splitting data into training and testing sets.")
+            print(f"Using data as provided (no train/test split - treating as test data).")
             X = df.drop(columns=[target_column])
             y = df[target_column]
             
-            # Convert to numpy arrays to avoid feature name warnings
-            X_array = X.values
-            y_array = y.values
+            # Use the entire dataset as test data since the model is already trained
+            # This preserves the exact order and avoids shuffling issues
+            self.X_test = X.copy()
+            self.y_test = y.copy()
             
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-                X_array, y_array, test_size=0.2, random_state=42
-            )
-            
-            # Convert back to DataFrames for analysis but use position-based indexing for model predictions
-            self.X_train = pd.DataFrame(self.X_train, columns=X.columns)
-            self.X_test = pd.DataFrame(self.X_test, columns=X.columns)
-            self.y_train = pd.Series(self.y_train, name=target_column)
-            self.y_test = pd.Series(self.y_test, name=target_column)
+            # For SHAP purposes, use a subset as "training" data
+            # This is just for explainer initialization, not actual training
+            sample_size = min(100, len(X))
+            self.X_train = X.head(sample_size).copy()
+            self.y_train = y.head(sample_size).copy()
 
-            self.X_df = self.X_train  # Point to train data for backward compatibility
-            self.y_s = self.y_train
+            self.X_df = self.X_test  # Use test data for instance explanation
+            self.y_s = self.y_test
             self.feature_names = list(X.columns)
             self.target_name = target_column
             
@@ -1310,13 +1307,39 @@ class ModelService:
     def get_decision_tree(self) -> Dict[str, Any]:
         self._is_ready()
         
-        # Check if the model has trees (Random Forest, Extra Trees, etc.)
-        if not hasattr(self.model, 'estimators_'):
-            raise ValueError("The current model does not contain decision trees. Please use a tree-based model like RandomForest, ExtraTrees, etc.")
+        # Check if the model has trees (ensemble models or single decision tree)
+        if hasattr(self.model, 'estimators_'):
+            # Handle different ensemble model structures
+            estimators_attr = self.model.estimators_
+            
+            # Check if it's a GradientBoosting model (numpy array structure)
+            if isinstance(estimators_attr, np.ndarray):
+                # GradientBoosting: estimators_ is numpy array with shape (n_estimators, n_classes)
+                # For binary classification, we take the first class estimators
+                if estimators_attr.ndim == 2:
+                    # Extract trees from the first class (class 0)
+                    tree_estimators = [estimators_attr[i, 0] for i in range(estimators_attr.shape[0])]
+                else:
+                    # Fallback: flatten if unexpected structure
+                    tree_estimators = estimators_attr.flatten()
+                model_type = "gradient_boosting"
+            else:
+                # RandomForest, ExtraTrees: estimators_ is a list of tree objects
+                tree_estimators = estimators_attr
+                model_type = "ensemble"
+            
+            is_ensemble = True
+        elif hasattr(self.model, 'tree_'):
+            # Single decision tree (DecisionTreeClassifier)
+            tree_estimators = [self.model]
+            is_ensemble = False
+            model_type = "single_tree"
+        else:
+            raise ValueError("The current model does not contain decision trees. Please use a tree-based model like DecisionTree, RandomForest, ExtraTrees, GradientBoosting, etc.")
         
-        # Collect data for all trees in the ensemble
+        # Collect data for all trees (ensemble) or single tree
         trees_data = []
-        for idx, tree_estimator in enumerate(self.model.estimators_):
+        for idx, tree_estimator in enumerate(tree_estimators):
             tree_obj = tree_estimator.tree_
 
             def recurse(node, depth):
@@ -1377,8 +1400,20 @@ class ModelService:
             
             # Calculate tree accuracy on test set
             if self.X_test is not None and self.y_test is not None:
-                tree_predictions = tree_estimator.predict(self.X_test)
-                tree_accuracy = accuracy_score(self.y_test, tree_predictions)
+                try:
+                    # For gradient boosting, individual trees predict continuous values
+                    # We can't compute classification accuracy for individual trees in GB
+                    if model_type == "gradient_boosting":
+                        # For GB, use the full model accuracy as approximation
+                        full_model_predictions = self.model.predict(self.X_test)
+                        tree_accuracy = accuracy_score(self.y_test, full_model_predictions)
+                    else:
+                        # For other ensemble methods, individual trees can be evaluated
+                        tree_predictions = tree_estimator.predict(self.X_test)
+                        tree_accuracy = accuracy_score(self.y_test, tree_predictions)
+                except Exception as e:
+                    # Fallback if accuracy calculation fails
+                    tree_accuracy = 0.0
             else:
                 tree_accuracy = 0.0
             
@@ -1399,7 +1434,12 @@ class ModelService:
                 "tree_structure": recurse(0, 0)
             })
 
-        return {"trees": trees_data}
+        return {
+            "trees": trees_data,
+            "model_type": model_type,
+            "num_trees": len(trees_data),
+            "algorithm": type(self.model).__name__
+        }
 
     # --- Section 4: Feature Dependence (PDP, SHAP dependence, ICE) ---
     def partial_dependence(self, feature_name: str, num_points: int = 20) -> Dict[str, Any]:
