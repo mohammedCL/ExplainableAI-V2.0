@@ -122,6 +122,8 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                     setPair({ f1: a, f2: b });
                 } else if (Array.isArray(net?.matrix_features) && net.matrix_features.length >= 2) {
                     setPair({ f1: net.matrix_features[0], f2: net.matrix_features[1] });
+                } else if (Array.isArray(net?.feature_names) && net.feature_names.length >= 2) {
+                    setPair({ f1: net.feature_names[0], f2: net.feature_names[1] });
                 }
             } catch (e: any) {
                 console.warn(e);
@@ -177,6 +179,8 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                                 setPair({ f1: a, f2: b });
                             } else if (Array.isArray(network?.matrix_features) && network.matrix_features.length >= 2) {
                                 setPair({ f1: network.matrix_features[0], f2: network.matrix_features[1] });
+                            } else if (Array.isArray(network?.feature_names) && network.feature_names.length >= 2) {
+                                setPair({ f1: network.feature_names[0], f2: network.feature_names[1] });
                             }
                         }
                     }}
@@ -199,7 +203,11 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold flex items-center"><Network className="mr-2 text-blue-600" />Interaction {active === 'heatmap' ? 'Heatmap' : active === 'network' ? 'Network' : 'Pairwise'}</h3>
                             {network?.summary && (
-                                <div className="text-xs text-gray-500">Edges: {network.summary.total_edges} · Mean: {network.summary.mean_strength.toFixed(3)} · Median: {network.summary.median_strength.toFixed(3)}</div>
+                                <div className="text-xs text-gray-500">
+                                    Edges: {network.summary.total_edges || network.summary.total_interactions || 0} · 
+                                    Mean: {(network.summary.mean_strength || network.summary.avg_interaction_strength || 0).toFixed(3)} · 
+                                    Median: {(network.summary.median_strength || 0).toFixed(3)}
+                                </div>
                             )}
                         </div>
                         {loading && <div className="h-64 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>}
@@ -207,9 +215,9 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                             <div className="overflow-auto">
                                 <Plot
                                     data={[{
-                                        z: (network.matrix as number[][]),
-                                        x: network.matrix_features,
-                                        y: network.matrix_features,
+                                        z: (network.matrix || network.interaction_matrix) as number[][],
+                                        x: network.matrix_features || network.feature_names,
+                                        y: network.matrix_features || network.feature_names,
                                         type: 'heatmap',
                                         colorscale: [[0, '#eef2ff'], [1, '#16a34a']],
                                         zmin: 0,
@@ -295,11 +303,11 @@ const FeatureInteractions: React.FC<{ modelType?: string }> = () => {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
                             <div className="text-xs text-gray-500">Total Edges</div>
-                            <div className="text-lg font-bold">{network.summary?.total_edges ?? 0}</div>
+                            <div className="text-lg font-bold">{network.summary?.total_edges ?? network.summary?.total_interactions ?? 0}</div>
                         </div>
                         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
                             <div className="text-xs text-gray-500">Mean Strength</div>
-                            <div className="text-lg font-bold">{(network.summary?.mean_strength ?? 0).toFixed(3)}</div>
+                            <div className="text-lg font-bold">{(network.summary?.mean_strength ?? network.summary?.avg_interaction_strength ?? 0).toFixed(3)}</div>
                         </div>
                         <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
                             <div className="text-xs text-gray-500">Median Strength</div>

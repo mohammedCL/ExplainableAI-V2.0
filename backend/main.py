@@ -49,7 +49,7 @@ def read_root():
 @app.post("/upload/model-and-data", tags=["Setup"])
 async def upload_model_and_data(
     token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A model file (.joblib, .pkl, .pickle, or .onnx)."),
+    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
     data_file: UploadFile = File(..., description="A .csv dataset file."),
     target_column: str = Form(..., description="The name of the target variable column in the CSV.")
 ):
@@ -66,7 +66,7 @@ async def upload_model_and_data(
 @app.post("/upload/model-and-separate-datasets", tags=["Setup"])
 async def upload_model_and_separate_datasets(
     token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A model file (.joblib, .pkl, .pickle, or .onnx)."),
+    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
     train_file: UploadFile = File(..., description="Training dataset CSV file."),
     test_file: UploadFile = File(..., description="Test dataset CSV file."),
     target_column: str = Form(..., description="The name of the target variable column in both CSV files.")

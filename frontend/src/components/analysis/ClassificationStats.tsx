@@ -81,26 +81,68 @@ const ClassificationStats: React.FC = () => {
         (async () => {
             try {
                 const [r, t] = await Promise.all([postRocAnalysis(), postThresholdAnalysis(50)]);
+                console.log('ROC Analysis Response:', r);
+                console.log('Threshold Analysis Response:', t);
                 setRoc(r);
                 setThr(t);
-            } catch { /* handled visually */ }
+            } catch (error) {
+                console.error('Error fetching ROC/Threshold analysis:', error);
+                // Set empty states to stop loading
+                setRoc({ error: 'Failed to load ROC analysis' });
+                setThr({ error: 'Failed to load threshold analysis' });
+            }
         })();
     }, []);
 
     // Derived data guarded for nulls so hooks are called every render
-    const metrics = (stats?.metrics ?? { accuracy: 0, precision: 0, recall: 0, f1_score: 0, auc: 0 });
-    const confusion_matrix = (stats?.confusion_matrix ?? { true_negative: 0, false_positive: 0, false_negative: 0, true_positive: 0 });
 
-    const rocData = useMemo(() => {
-        if (!roc || !roc.roc_curve || !roc.roc_curve.fpr || !roc.roc_curve.tpr) return [] as any[];
-        
-        // Ensure arrays have same length and contain valid numbers
-        const fpr = roc.roc_curve.fpr.filter((val: any) => typeof val === 'number' && isFinite(val));
-        const tpr = roc.roc_curve.tpr.filter((val: any) => typeof val === 'number' && isFinite(val));
-        
-        if (fpr.length !== tpr.length || fpr.length === 0) return [] as any[];
-        
-        return fpr.map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] }));
+    const metrics = (stats?.metrics ?? { accuracy: 0, precision: 0, recall: 0, f1_score: 0, auc: 0 });
+    const confusion_matrix = stats?.confusion_matrix;
+    const classification_type = stats?.classification_type;
+    const classes = stats?.confusion_matrix?.classes || roc?.classes || [];
+
+    // ROC data for binary and multiclass
+    const rocCurves = useMemo(() => {
+        if (!roc || !roc.roc_curve) return null;
+        if (roc.classification_type === 'binary') {
+            const fpr = roc.roc_curve.fpr || [];
+            const tpr = roc.roc_curve.tpr || [];
+            return [{ label: 'ROC', data: fpr.map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] })) }];
+        } else if (roc.classification_type === 'multiclass' && roc.roc_curve.per_class) {
+            // Per-class ROC curves
+            const perClassCurves = Object.entries(roc.roc_curve.per_class).map(([cls, curve]: any) => {
+                const fpr = curve.fpr || [];
+                const tpr = curve.tpr || [];
+                const minLength = Math.min(fpr.length, tpr.length);
+                return {
+                    label: `Class ${cls}`,
+                    data: fpr.slice(0, minLength).map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] }))
+                };
+            });
+            
+            const additionalCurves = [];
+            if (roc.roc_curve.macro) {
+                const fpr = roc.roc_curve.macro.fpr || [];
+                const tpr = roc.roc_curve.macro.tpr || [];
+                const minLength = Math.min(fpr.length, tpr.length);
+                additionalCurves.push({ 
+                    label: 'Macro Avg', 
+                    data: fpr.slice(0, minLength).map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] })) 
+                });
+            }
+            if (roc.roc_curve.micro) {
+                const fpr = roc.roc_curve.micro.fpr || [];
+                const tpr = roc.roc_curve.micro.tpr || [];
+                const minLength = Math.min(fpr.length, tpr.length);
+                additionalCurves.push({ 
+                    label: 'Micro Avg', 
+                    data: fpr.slice(0, minLength).map((f: number, i: number) => ({ fpr: f, tpr: tpr[i] })) 
+                });
+            }
+            
+            return [...perClassCurves, ...additionalCurves];
+        }
+        return null;
     }, [roc]);
     const diagData = useMemo(() => ([{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }]), []);
 
@@ -167,53 +209,52 @@ const ClassificationStats: React.FC = () => {
                             <PieChart className="mr-2" />
                             Confusion Matrix
                         </h2>
-                        <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                            <div className="text-center">
-                                <div className="text-sm font-medium text-gray-500 mb-4">Predicted</div>
+                        {classification_type === 'binary' && confusion_matrix ? (
+                            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                                <div className="text-center">
+                                    <div className="text-sm font-medium text-gray-500 mb-4">Predicted</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-xs text-gray-400">Negative</div>
+                                        <div className="text-xs text-gray-400">Positive</div>
+                                    </div>
+                                </div>
+                                <div></div>
+                                <div className="flex items-center">
+                                    <div className="text-sm font-medium text-gray-500 -rotate-90 w-8">Actual</div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="text-xs text-gray-400">Negative</div>
-                                    <div className="text-xs text-gray-400">Positive</div>
+                                    <ConfusionMatrixCell label="TN" value={confusion_matrix.true_negative} isCorrect={true} />
+                                    <ConfusionMatrixCell label="FP" value={confusion_matrix.false_positive} isCorrect={false} />
+                                    <ConfusionMatrixCell label="FN" value={confusion_matrix.false_negative} isCorrect={false} />
+                                    <ConfusionMatrixCell label="TP" value={confusion_matrix.true_positive} isCorrect={true} />
                                 </div>
                             </div>
-                            <div></div>
-                            <div className="flex items-center">
-                                <div className="text-sm font-medium text-gray-500 -rotate-90 w-8">Actual</div>
+                        ) : confusion_matrix && confusion_matrix.matrix && classes.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-max mx-auto border border-gray-300 dark:border-gray-700">
+                                    <thead>
+                                        <tr>
+                                            <th className="p-2 border-b"></th>
+                                            {classes.map((cls: any, idx: number) => (
+                                                <th key={idx} className="p-2 border-b text-xs">Pred {cls}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {confusion_matrix.matrix.map((row: any[], i: number) => (
+                                            <tr key={i}>
+                                                <td className="p-2 border-r text-xs">Actual {classes[i]}</td>
+                                                {row.map((val: any, j: number) => (
+                                                    <td key={j} className="p-2 text-center">{val}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <ConfusionMatrixCell
-                                    label="TN"
-                                    value={confusion_matrix.true_negative}
-                                    isCorrect={true}
-                                />
-                                <ConfusionMatrixCell
-                                    label="FP"
-                                    value={confusion_matrix.false_positive}
-                                    isCorrect={false}
-                                />
-                                <ConfusionMatrixCell
-                                    label="FN"
-                                    value={confusion_matrix.false_negative}
-                                    isCorrect={false}
-                                />
-                                <ConfusionMatrixCell
-                                    label="TP"
-                                    value={confusion_matrix.true_positive}
-                                    isCorrect={true}
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-4 text-center text-sm text-gray-500">
-                            <div className="flex justify-center space-x-6">
-                                <div className="flex items-center">
-                                    <div className="w-3 h-3 bg-green-200 rounded mr-2"></div>
-                                    Correct Predictions
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="w-3 h-3 bg-red-200 rounded mr-2"></div>
-                                    Incorrect Predictions
-                                </div>
-                            </div>
-                        </div>
+                        ) : (
+                            <div>No confusion matrix available.</div>
+                        )}
                     </div>
 
                     {/* Enhanced ROC Curve */}
@@ -221,15 +262,17 @@ const ClassificationStats: React.FC = () => {
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TrendingUp className="mr-2" /> ROC Analysis</h2>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2" style={{ width: '100%', height: 320 }}>
-                                {roc ? (
+                                {rocCurves && rocCurves.length > 0 ? (
                                     <ResponsiveContainer>
-                                        <LineChart data={rocData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                        <LineChart margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis type="number" dataKey="fpr" domain={[0, 1]} tickFormatter={(v) => Number(v).toFixed(1)} />
                                             <YAxis type="number" domain={[0, 1]} tickFormatter={(v) => Number(v).toFixed(1)} />
                                             <Tooltip formatter={(v: number) => Number(v).toFixed(3)} />
                                             <Line data={diagData} dataKey="tpr" stroke="#9CA3AF" strokeDasharray="5 5" dot={false} isAnimationActive={false} />
-                                            <Line type="monotone" dataKey="tpr" stroke="#3b82f6" dot={false} />
+                                            {rocCurves.map((curve, idx) => (
+                                                <Line key={curve.label} data={curve.data} dataKey="tpr" name={curve.label} stroke={['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#6366f1', '#f59e42', '#10b981', '#f43f5e', '#fbbf24', '#6366f1', '#f472b6'][idx % 11]} dot={false} />
+                                            ))}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 ) : (
@@ -239,24 +282,51 @@ const ClassificationStats: React.FC = () => {
                                 )}
                             </div>
                             <div className="space-y-3">
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
-                                    <div className="text-xs text-gray-500">AUC Score</div>
-                                    <div className="text-2xl font-bold text-blue-600">
-                                        {safeNumber(roc?.metrics?.auc_score ?? metrics.auc, 0).toFixed(3)}
-                                    </div>
-                                </div>
-                                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded">
-                                    <div className="text-xs text-gray-500">Optimal Threshold</div>
-                                    <div className="text-2xl font-bold text-purple-600">
-                                        {safeNumber(roc?.metrics?.optimal_threshold, 0.5).toFixed(2)}
-                                    </div>
-                                </div>
-                                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded">
-                                    <div className="text-xs text-gray-500">Sensitivity at Optimal</div>
-                                    <div className="text-2xl font-bold text-green-600">
-                                        {safeNumber(roc?.metrics?.sensitivity ?? metrics.recall, 0).toFixed(2)}
-                                    </div>
-                                </div>
+                                {roc?.classification_type === 'binary' ? (
+                                    <>
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                            <div className="text-xs text-gray-500">AUC Score</div>
+                                            <div className="text-2xl font-bold text-blue-600">
+                                                {safeNumber(roc?.metrics?.auc_score ?? metrics.auc, 0).toFixed(3)}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded">
+                                            <div className="text-xs text-gray-500">Optimal Threshold</div>
+                                            <div className="text-2xl font-bold text-purple-600">
+                                                {safeNumber(roc?.metrics?.optimal_threshold, 0.5).toFixed(2)}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded">
+                                            <div className="text-xs text-gray-500">Sensitivity at Optimal</div>
+                                            <div className="text-2xl font-bold text-green-600">
+                                                {safeNumber(roc?.metrics?.sensitivity ?? metrics.recall, 0).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : roc?.classification_type === 'multiclass' ? (
+                                    <>
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                            <div className="text-xs text-gray-500">Macro AUC</div>
+                                            <div className="text-2xl font-bold text-blue-600">
+                                                {safeNumber(roc?.metrics?.auc_score_macro, 0).toFixed(3)}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                            <div className="text-xs text-gray-500">Micro AUC</div>
+                                            <div className="text-2xl font-bold text-blue-600">
+                                                {safeNumber(roc?.metrics?.auc_score_micro, 0).toFixed(3)}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                            <div className="text-xs text-gray-500">Per-Class AUC</div>
+                                            <div className="text-xs">
+                                                {roc?.metrics?.per_class_auc && Object.entries(roc.metrics.per_class_auc).map(([cls, auc]: any) => (
+                                                    <div key={cls}>Class {cls}: <span className="font-bold">{safeNumber(auc, 0).toFixed(3)}</span></div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : null}
                             </div>
                         </div>
                     </div>
@@ -267,41 +337,75 @@ const ClassificationStats: React.FC = () => {
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                             <h3 className="text-lg font-semibold mb-4">Performance Summary</h3>
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                    <span className="text-sm font-medium">Total Samples</span>
-                                    <span className="font-bold">
-                                        {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0) +
-                                            safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                                    <span className="text-sm font-medium">Correct Predictions</span>
-                                    <span className="font-bold text-green-600">
-                                        {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                                    <span className="text-sm font-medium">Incorrect Predictions</span>
-                                    <span className="font-bold text-red-600">
-                                        {safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                    <span className="text-sm font-medium">Error Rate</span>
-                                    <span className="font-bold">
-                                        {(((confusion_matrix.false_positive + confusion_matrix.false_negative) /
-                                            (confusion_matrix.true_positive + confusion_matrix.true_negative +
-                                                confusion_matrix.false_positive + confusion_matrix.false_negative)) * 100).toFixed(1)}%
-                                    </span>
-                                </div>
+                                {classification_type === 'binary' && confusion_matrix ? (
+                                    <>
+                                        <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Total Samples</span>
+                                            <span className="font-bold">
+                                                {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0) +
+                                                    safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Correct Predictions</span>
+                                            <span className="font-bold text-green-600">
+                                                {safeNumber(confusion_matrix.true_positive, 0) + safeNumber(confusion_matrix.true_negative, 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Incorrect Predictions</span>
+                                            <span className="font-bold text-red-600">
+                                                {safeNumber(confusion_matrix.false_positive, 0) + safeNumber(confusion_matrix.false_negative, 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                            <span className="text-sm font-medium">Error Rate</span>
+                                            <span className="font-bold">
+                                                {(((confusion_matrix.false_positive + confusion_matrix.false_negative) /
+                                                    (confusion_matrix.true_positive + confusion_matrix.true_negative +
+                                                        confusion_matrix.false_positive + confusion_matrix.false_negative)) * 100).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : confusion_matrix && confusion_matrix.matrix ? (
+                                    <>
+                                        <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Total Samples</span>
+                                            <span className="font-bold">
+                                                {confusion_matrix.matrix.flat().reduce((sum: number, val: number) => sum + val, 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Correct Predictions</span>
+                                            <span className="font-bold text-green-600">
+                                                {confusion_matrix.matrix.reduce((sum: number, row: number[], i: number) => sum + row[i], 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                            <span className="text-sm font-medium">Incorrect Predictions</span>
+                                            <span className="font-bold text-red-600">
+                                                {confusion_matrix.matrix.flat().reduce((sum: number, val: number) => sum + val, 0) - 
+                                                 confusion_matrix.matrix.reduce((sum: number, row: number[], i: number) => sum + row[i], 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                            <span className="text-sm font-medium">Error Rate</span>
+                                            <span className="font-bold">
+                                                {((1 - metrics.accuracy) * 100).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center text-gray-500">No performance summary available</div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Classification Threshold Analysis (diagonal heatmap style) */}
+                        {/* Classification Threshold Analysis */}
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                             <h3 className="text-lg font-semibold mb-4">Threshold Analysis</h3>
                             <div style={{ width: '100%', height: 280 }}>
-                                {thr ? (
+                                {thr && !thr.error ? (
                                     <ResponsiveContainer>
                                         <LineChart data={(thr?.threshold_metrics || []).map((m: any) => ({ x: m.threshold, precision: m.precision, recall: m.recall, f1: m.f1_score, acc: m.accuracy }))}>
                                             <CartesianGrid strokeDasharray="3 3" />
@@ -314,6 +418,10 @@ const ClassificationStats: React.FC = () => {
                                             <Line type="monotone" dataKey="acc" stroke="#3b82f6" dot={false} />
                                         </LineChart>
                                     </ResponsiveContainer>
+                                ) : thr && thr.error ? (
+                                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
+                                        {thr.error}
+                                    </div>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
                                         <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading threshold analysis
