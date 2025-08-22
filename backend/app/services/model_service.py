@@ -32,13 +32,9 @@ class ModelService:
 
     # === Model Loading Methods (delegated to base service) ===
     
-    def load_model_and_data(self, model_path: str, data_path: str, target_column: str):
-        """Load model and dataset from local files."""
-        return self.base.load_model_and_data(model_path, data_path, target_column)
-
-    def load_model_and_separate_datasets(self, model_path: str, train_data_path: str, test_data_path: str, target_column: str):
-        """Load model and separate train/test datasets from local files."""
-        return self.base.load_model_and_separate_datasets(model_path, train_data_path, test_data_path, target_column)
+    def load_model_and_datasets(self, model_path: str, data_path: str = None, train_data_path: str = None, test_data_path: str = None, target_column: str = ""):
+        """Unified method to load model and dataset(s) from local files."""
+        return self.base.load_model_and_datasets(model_path, data_path, train_data_path, test_data_path, target_column)
 
     # === Analysis Methods (delegated to analysis service) ===
     

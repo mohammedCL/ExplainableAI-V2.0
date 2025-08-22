@@ -1,14 +1,13 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Depends, Body
+from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from typing import Dict
-from typing import List
+from typing import Dict, List
 
 from app.core.config import settings
 from app.core.auth import verify_token
 from app.services.model_service import ModelService
 from app.services.ai_explanation_service import AIExplanationService
+from app.services.s3_service import S3Service
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
@@ -22,6 +21,7 @@ app.add_middleware(
 
 model_service = ModelService()
 ai_explanation_service = AIExplanationService()
+s3_service = S3Service()
 
 
 # Auto-load functionality disabled as requested by user
@@ -46,47 +46,89 @@ def handle_request(service_func, *args, **kwargs):
 def read_root():
     return {"message": f"Welcome to the {settings.PROJECT_NAME}"}
 
-@app.post("/upload/model-and-data", tags=["Setup"])
-async def upload_model_and_data(
-    token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
-    data_file: UploadFile = File(..., description="A .csv dataset file."),
-    target_column: str = Form(..., description="The name of the target variable column in the CSV.")
-):
-    model_path = os.path.join(settings.STORAGE_DIR, model_file.filename)
-    with open(model_path, "wb") as buffer:
-        buffer.write(await model_file.read())
-    
-    data_path = os.path.join(settings.STORAGE_DIR, data_file.filename)
-    with open(data_path, "wb") as buffer:
-        buffer.write(await data_file.read())
+@app.get("/api/files", tags=["Setup"])
+async def list_files(token: str = Depends(verify_token)):
+    """Get available files from S3 bucket"""
+    try:
+        file_map = s3_service._get_file_list()
+        if not file_map:
+            raise HTTPException(status_code=500, detail="No files found in S3")
+        
+        models = [name for name in file_map.keys() if name.endswith(('.joblib', '.pkl', '.model'))]
+        datasets = [name for name in file_map.keys() if name.endswith('.csv')]
+        
+        return {"models": models, "datasets": datasets}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-    return handle_request(model_service.load_model_and_data, model_path, data_path, target_column)
-
-@app.post("/upload/model-and-separate-datasets", tags=["Setup"])
-async def upload_model_and_separate_datasets(
-    token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
-    train_file: UploadFile = File(..., description="Training dataset CSV file."),
-    test_file: UploadFile = File(..., description="Test dataset CSV file."),
-    target_column: str = Form(..., description="The name of the target variable column in both CSV files.")
-):
-    # Save model file
-    model_path = os.path.join(settings.STORAGE_DIR, model_file.filename)
-    with open(model_path, "wb") as buffer:
-        buffer.write(await model_file.read())
+@app.post("/load", tags=["Setup"])
+async def load_data(payload: Dict = Body(...), token: str = Depends(verify_token)):
+    """
+    Load model and dataset(s) from S3
     
-    # Save training dataset
-    train_path = os.path.join(settings.STORAGE_DIR, f"train_{train_file.filename}")
-    with open(train_path, "wb") as buffer:
-        buffer.write(await train_file.read())
+    Single dataset:
+    {
+        "model": "model.joblib",
+        "dataset": "dataset.csv",
+        "target_column": "target"
+    }
     
-    # Save test dataset
-    test_path = os.path.join(settings.STORAGE_DIR, f"test_{test_file.filename}")
-    with open(test_path, "wb") as buffer:
-        buffer.write(await test_file.read())
-
-    return handle_request(model_service.load_model_and_separate_datasets, model_path, train_path, test_path, target_column)
+    Train/Test datasets:
+    {
+        "model": "model.joblib", 
+        "train_dataset": "train.csv",
+        "test_dataset": "test.csv",
+        "target_column": "target"
+    }
+    """
+    try:
+        model_name = payload.get("model")
+        dataset_name = payload.get("dataset")
+        train_dataset = payload.get("train_dataset")
+        test_dataset = payload.get("test_dataset")
+        target_column = payload.get("target_column", "target")
+        
+        if not model_name:
+            raise HTTPException(status_code=400, detail="Missing model name")
+        
+        # Check which scenario we're in
+        if dataset_name:
+            # Single dataset scenario
+            download_result = s3_service.download_model_and_datasets(
+                model_s3_key=model_name,
+                data_s3_key=dataset_name
+            )
+            
+            if not download_result:
+                raise HTTPException(status_code=500, detail="Failed to download files")
+            
+            model_path, data_path = download_result
+            return handle_request(model_service.load_model_and_datasets, 
+                                model_path, data_path=data_path, target_column=target_column)
+        
+        elif train_dataset and test_dataset:
+            # Train/Test datasets scenario
+            download_result = s3_service.download_model_and_datasets(
+                model_s3_key=model_name,
+                train_s3_key=train_dataset,
+                test_s3_key=test_dataset
+            )
+            
+            if not download_result:
+                raise HTTPException(status_code=500, detail="Failed to download files")
+            
+            model_path, train_path, test_path = download_result
+            return handle_request(model_service.load_model_and_datasets, 
+                                model_path, train_data_path=train_path, test_data_path=test_path, target_column=target_column)
+        
+        else:
+            raise HTTPException(status_code=400, detail="Provide either 'dataset' OR both 'train_dataset' and 'test_dataset'")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/analysis/overview", tags=["Analysis"])
 async def get_overview(token: str = Depends(verify_token)):
@@ -116,9 +158,9 @@ async def get_feature_dependence(feature_name: str, token: str = Depends(verify_
 async def list_instances(sort_by: str = 'prediction', limit: int = 100, token: str = Depends(verify_token)):
     return handle_request(model_service.list_instances, sort_by, limit)
 
-@app.get("/analysis/dataset-comparison", tags=["Analysis"])
-async def get_dataset_comparison(token: str = Depends(verify_token)):
-    return handle_request(model_service.get_dataset_comparison)
+# @app.get("/analysis/dataset-comparison", tags=["Analysis"])
+# async def get_dataset_comparison(token: str = Depends(verify_token)):
+#     return handle_request(model_service.get_dataset_comparison)
 
 # --- New enterprise feature endpoints ---
 @app.get("/api/features", tags=["Features"])
