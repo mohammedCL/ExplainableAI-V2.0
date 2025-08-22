@@ -50,7 +50,7 @@ def read_root():
 async def list_files(token: str = Depends(verify_token)):
     """Get available files from S3 bucket"""
     try:
-        file_map = s3_service._get_file_list()
+        file_map = s3_service.get_file_list()
         if not file_map:
             raise HTTPException(status_code=500, detail="No files found in S3")
         
