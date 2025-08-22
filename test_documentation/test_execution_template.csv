@@ -1,0 +1,2 @@
+date,tester_name,test_environment,browser,screen_resolution,test_session_notes,overall_pass_rate,critical_issues_found,recommendations
+,,Local/Staging/Production,Chrome/Firefox/Safari/Edge,1920x1080/1366x768/Mobile,,,,

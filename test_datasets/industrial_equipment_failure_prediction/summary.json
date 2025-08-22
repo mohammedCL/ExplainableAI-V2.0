@@ -1,0 +1,83 @@
+{
+  "dataset_name": "Industrial Equipment Failure Prediction",
+  "dataset_description": "Industrial Equipment Failure Prediction",
+  "target_column": "equipment_failure",
+  "n_samples_train": 1260,
+  "n_samples_test": 540,
+  "n_features": 15,
+  "feature_names": [
+    "sensor_1",
+    "sensor_2",
+    "sensor_3",
+    "sensor_4",
+    "sensor_5",
+    "temperature",
+    "humidity",
+    "pressure",
+    "vibration",
+    "noise_level",
+    "interaction_temp_humid",
+    "quadratic_sensor",
+    "sine_transform",
+    "exp_temperature",
+    "complex_interaction"
+  ],
+  "class_distribution_train": {
+    "0": 918,
+    "1": 342
+  },
+  "class_distribution_test": {
+    "0": 393,
+    "1": 147
+  },
+  "models": {
+    "random_forest_balanced": {
+      "description": "Well-balanced Random Forest",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\random_forest_balanced_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.9222,
+      "overfitting_gap": 0.0778
+    },
+    "random_forest_overfitted": {
+      "description": "Potentially overfitted Random Forest",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\random_forest_overfitted_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.9315,
+      "overfitting_gap": 0.0685
+    },
+    "gradient_boosting": {
+      "description": "Gradient Boosting Classifier",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\gradient_boosting_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.9481,
+      "overfitting_gap": 0.0519
+    },
+    "logistic_regression": {
+      "description": "Logistic Regression",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\logistic_regression_model.joblib",
+      "scaler_path": "test_datasets\\industrial_equipment_failure_prediction\\logistic_regression_scaler.joblib",
+      "train_accuracy": 0.9794,
+      "test_accuracy": 0.9759,
+      "overfitting_gap": 0.0034
+    },
+    "decision_tree_simple": {
+      "description": "Simple Decision Tree",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\decision_tree_simple_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9532,
+      "test_accuracy": 0.8944,
+      "overfitting_gap": 0.0587
+    },
+    "extra_trees": {
+      "description": "Extra Trees Classifier",
+      "model_path": "test_datasets\\industrial_equipment_failure_prediction\\extra_trees_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9833,
+      "test_accuracy": 0.8944,
+      "overfitting_gap": 0.0889
+    }
+  }
+}

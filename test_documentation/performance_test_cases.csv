@@ -1,0 +1,4 @@
+test_id,test_category,test_description,metric,target,test_data,measurement_method
+PERF_001,Load Time,Measure classification stats load time,Page load time,< 5 seconds,Large dataset (2000+ samples),Browser developer tools
+PERF_002,Chart Rendering,Measure chart rendering performance,Chart render time,< 2 seconds,Complex ROC and threshold charts,Performance timeline
+PERF_003,AI Explanation,Measure AI explanation generation time,AI response time,< 10 seconds,Complex dataset with many features,Network tab timing

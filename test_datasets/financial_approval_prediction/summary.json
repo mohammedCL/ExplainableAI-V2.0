@@ -1,0 +1,88 @@
+{
+  "dataset_name": "Financial Approval Prediction",
+  "dataset_description": "Financial Approval Prediction",
+  "target_column": "approval_status",
+  "n_samples_train": 1400,
+  "n_samples_test": 600,
+  "n_features": 20,
+  "feature_names": [
+    "income_score",
+    "credit_history",
+    "employment_years",
+    "debt_ratio",
+    "savings_amount",
+    "education_level",
+    "age_group",
+    "property_value",
+    "monthly_expenses",
+    "investment_portfolio",
+    "insurance_coverage",
+    "loan_history",
+    "payment_behavior",
+    "financial_stability",
+    "risk_tolerance",
+    "market_volatility",
+    "economic_indicator",
+    "demographic_factor",
+    "lifestyle_score",
+    "social_score"
+  ],
+  "class_distribution_train": {
+    "1": 703,
+    "0": 697
+  },
+  "class_distribution_test": {
+    "1": 301,
+    "0": 299
+  },
+  "models": {
+    "random_forest_balanced": {
+      "description": "Well-balanced Random Forest",
+      "model_path": "test_datasets\\financial_approval_prediction\\random_forest_balanced_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9986,
+      "test_accuracy": 0.9283,
+      "overfitting_gap": 0.0702
+    },
+    "random_forest_overfitted": {
+      "description": "Potentially overfitted Random Forest",
+      "model_path": "test_datasets\\financial_approval_prediction\\random_forest_overfitted_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.9367,
+      "overfitting_gap": 0.0633
+    },
+    "gradient_boosting": {
+      "description": "Gradient Boosting Classifier",
+      "model_path": "test_datasets\\financial_approval_prediction\\gradient_boosting_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.9483,
+      "overfitting_gap": 0.0517
+    },
+    "logistic_regression": {
+      "description": "Logistic Regression",
+      "model_path": "test_datasets\\financial_approval_prediction\\logistic_regression_model.joblib",
+      "scaler_path": "test_datasets\\financial_approval_prediction\\logistic_regression_scaler.joblib",
+      "train_accuracy": 0.8521,
+      "test_accuracy": 0.86,
+      "overfitting_gap": -0.0079
+    },
+    "decision_tree_simple": {
+      "description": "Simple Decision Tree",
+      "model_path": "test_datasets\\financial_approval_prediction\\decision_tree_simple_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.8971,
+      "test_accuracy": 0.8417,
+      "overfitting_gap": 0.0555
+    },
+    "extra_trees": {
+      "description": "Extra Trees Classifier",
+      "model_path": "test_datasets\\financial_approval_prediction\\extra_trees_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9993,
+      "test_accuracy": 0.9317,
+      "overfitting_gap": 0.0676
+    }
+  }
+}

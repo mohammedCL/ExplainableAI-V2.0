@@ -1,0 +1,28 @@
+test_id,test_category,test_description,test_steps,expected_result,priority,test_data
+UI_001,Upload Functionality,Upload model and dataset files,"1. Navigate to upload page
+2. Select model file
+3. Select train dataset
+4. Select test dataset
+5. Enter target column
+6. Click upload","Files upload successfully, redirect to classification stats",High,Any valid model and dataset combination
+UI_002,Classification Stats Display,Verify all classification metrics display,"1. Upload model and data
+2. Navigate to classification stats
+3. Check all metric cards
+4. Verify confusion matrix
+5. Check ROC curve",All metrics display with correct values,High,Financial approval dataset
+UI_003,Threshold Analysis,Test threshold analysis functionality,"1. Navigate to classification stats
+2. Locate threshold analysis chart
+3. Verify precision-recall curves
+4. Check optimal threshold marking",Threshold analysis chart displays with interactive elements,Medium,Medical disease risk dataset
+UI_004,AI Explanation,Test AI explanation generation,"1. Click ""Explain with AI"" button
+2. Wait for explanation
+3. Verify explanation content
+4. Check explanation relevance",AI generates relevant explanation of the classification results,Medium,Any dataset
+UI_005,Responsive Design,Test UI responsiveness,"1. Open app in different screen sizes
+2. Check mobile view
+3. Verify chart scaling
+4. Test navigation on small screens",UI adapts correctly to different screen sizes,Low,Any dataset
+UI_006,Error Handling,Test error handling for invalid inputs,"1. Upload invalid model file
+2. Upload mismatched datasets
+3. Enter wrong target column
+4. Check error messages",Clear error messages displayed for all invalid inputs,High,Invalid/corrupted files

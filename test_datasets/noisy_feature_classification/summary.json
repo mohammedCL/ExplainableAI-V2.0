@@ -1,0 +1,93 @@
+{
+  "dataset_name": "Noisy Feature Classification",
+  "dataset_description": "Noisy Feature Classification",
+  "target_column": "target_class",
+  "n_samples_train": 840,
+  "n_samples_test": 360,
+  "n_features": 25,
+  "feature_names": [
+    "feature_1",
+    "feature_2",
+    "feature_3",
+    "feature_4",
+    "feature_5",
+    "feature_6",
+    "feature_7",
+    "feature_8",
+    "feature_9",
+    "feature_10",
+    "feature_11",
+    "feature_12",
+    "feature_13",
+    "feature_14",
+    "feature_15",
+    "feature_16",
+    "feature_17",
+    "feature_18",
+    "feature_19",
+    "feature_20",
+    "feature_21",
+    "feature_22",
+    "feature_23",
+    "feature_24",
+    "feature_25"
+  ],
+  "class_distribution_train": {
+    "1": 421,
+    "0": 419
+  },
+  "class_distribution_test": {
+    "1": 180,
+    "0": 180
+  },
+  "models": {
+    "random_forest_balanced": {
+      "description": "Well-balanced Random Forest",
+      "model_path": "test_datasets\\noisy_feature_classification\\random_forest_balanced_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9988,
+      "test_accuracy": 0.8222,
+      "overfitting_gap": 0.1766
+    },
+    "random_forest_overfitted": {
+      "description": "Potentially overfitted Random Forest",
+      "model_path": "test_datasets\\noisy_feature_classification\\random_forest_overfitted_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.8361,
+      "overfitting_gap": 0.1639
+    },
+    "gradient_boosting": {
+      "description": "Gradient Boosting Classifier",
+      "model_path": "test_datasets\\noisy_feature_classification\\gradient_boosting_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 1.0,
+      "test_accuracy": 0.8472,
+      "overfitting_gap": 0.1528
+    },
+    "logistic_regression": {
+      "description": "Logistic Regression",
+      "model_path": "test_datasets\\noisy_feature_classification\\logistic_regression_model.joblib",
+      "scaler_path": "test_datasets\\noisy_feature_classification\\logistic_regression_scaler.joblib",
+      "train_accuracy": 0.7048,
+      "test_accuracy": 0.6861,
+      "overfitting_gap": 0.0187
+    },
+    "decision_tree_simple": {
+      "description": "Simple Decision Tree",
+      "model_path": "test_datasets\\noisy_feature_classification\\decision_tree_simple_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.8214,
+      "test_accuracy": 0.7361,
+      "overfitting_gap": 0.0853
+    },
+    "extra_trees": {
+      "description": "Extra Trees Classifier",
+      "model_path": "test_datasets\\noisy_feature_classification\\extra_trees_model.joblib",
+      "scaler_path": null,
+      "train_accuracy": 0.9976,
+      "test_accuracy": 0.8583,
+      "overfitting_gap": 0.1393
+    }
+  }
+}
