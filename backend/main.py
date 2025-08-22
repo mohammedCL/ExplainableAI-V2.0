@@ -46,79 +46,89 @@ def handle_request(service_func, *args, **kwargs):
 def read_root():
     return {"message": f"Welcome to the {settings.PROJECT_NAME}"}
 
-@app.post("/load/model-and-data", tags=["Setup"])
-async def load_model_and_data_from_s3(
-    payload: Dict = Body(...),
-    token: str = Depends(verify_token)
-):
+@app.get("/api/files", tags=["Setup"])
+async def list_files(token: str = Depends(verify_token)):
+    """Get available files from S3 bucket"""
+    try:
+        file_map = s3_service._get_file_list()
+        if not file_map:
+            raise HTTPException(status_code=500, detail="No files found in S3")
+        
+        models = [name for name in file_map.keys() if name.endswith(('.joblib', '.pkl', '.model'))]
+        datasets = [name for name in file_map.keys() if name.endswith('.csv')]
+        
+        return {"models": models, "datasets": datasets}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.post("/load", tags=["Setup"])
+async def load_data(payload: Dict = Body(...), token: str = Depends(verify_token)):
     """
-    Unified endpoint to load model and dataset(s) from S3 bucket. 
-    Supports both single dataset and separate train/test scenarios.
+    Load model and dataset(s) from S3
     
-    Expected payload for single dataset:
+    Single dataset:
     {
-        "model_s3_key": "path/to/model.joblib",
-        "data_s3_key": "path/to/dataset.csv",
-        "target_column": "target_variable_name"
+        "model": "model.joblib",
+        "dataset": "dataset.csv",
+        "target_column": "target"
     }
     
-    Expected payload for separate train/test datasets:
+    Train/Test datasets:
     {
-        "model_s3_key": "path/to/model.joblib",
-        "train_s3_key": "path/to/train_dataset.csv",
-        "test_s3_key": "path/to/test_dataset.csv",
-        "target_column": "target_variable_name"
+        "model": "model.joblib", 
+        "train_dataset": "train.csv",
+        "test_dataset": "test.csv",
+        "target_column": "target"
     }
     """
     try:
-        model_s3_key = payload.get("model_s3_key")
-        data_s3_key = payload.get("data_s3_key")
-        train_s3_key = payload.get("train_s3_key")
-        test_s3_key = payload.get("test_s3_key")
-        target_column = payload.get("target_column")
+        model_name = payload.get("model")
+        dataset_name = payload.get("dataset")
+        train_dataset = payload.get("train_dataset")
+        test_dataset = payload.get("test_dataset")
+        target_column = payload.get("target_column", "target")
         
-        if not model_s3_key:
-            raise HTTPException(status_code=400, detail="Missing 'model_s3_key' in payload")
-        if not target_column:
-            raise HTTPException(status_code=400, detail="Missing 'target_column' in payload")
+        if not model_name:
+            raise HTTPException(status_code=400, detail="Missing model name")
         
-        # Validate input scenarios
-        if data_s3_key and (train_s3_key or test_s3_key):
-            raise HTTPException(status_code=400, detail="Provide either 'data_s3_key' OR 'train_s3_key'+'test_s3_key', not both")
-        
-        if not data_s3_key and not (train_s3_key and test_s3_key):
-            raise HTTPException(status_code=400, detail="Must provide either 'data_s3_key' OR both 'train_s3_key' and 'test_s3_key'")
-        
-        # Download files from S3 using unified function
-        download_result = s3_service.download_model_and_datasets(
-            model_s3_key=model_s3_key,
-            data_s3_key=data_s3_key,
-            train_s3_key=train_s3_key,
-            test_s3_key=test_s3_key
-        )
-        
-        # Check if download was successful
-        if not download_result or download_result[0] is None:
-            raise HTTPException(status_code=500, detail="Failed to download files from S3")
-        
-        # Use unified service method
-        if data_s3_key:
+        # Check which scenario we're in
+        if dataset_name:
             # Single dataset scenario
+            download_result = s3_service.download_model_and_datasets(
+                model_s3_key=model_name,
+                data_s3_key=dataset_name
+            )
+            
+            if not download_result:
+                raise HTTPException(status_code=500, detail="Failed to download files")
+            
             model_path, data_path = download_result
             return handle_request(model_service.load_model_and_datasets, 
                                 model_path, data_path=data_path, target_column=target_column)
-        else:
-            # Separate datasets scenario
+        
+        elif train_dataset and test_dataset:
+            # Train/Test datasets scenario
+            download_result = s3_service.download_model_and_datasets(
+                model_s3_key=model_name,
+                train_s3_key=train_dataset,
+                test_s3_key=test_dataset
+            )
+            
+            if not download_result:
+                raise HTTPException(status_code=500, detail="Failed to download files")
+            
             model_path, train_path, test_path = download_result
             return handle_request(model_service.load_model_and_datasets, 
                                 model_path, train_data_path=train_path, test_data_path=test_path, target_column=target_column)
         
+        else:
+            raise HTTPException(status_code=400, detail="Provide either 'dataset' OR both 'train_dataset' and 'test_dataset'")
+        
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error loading from S3: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/analysis/overview", tags=["Analysis"])
 async def get_overview(token: str = Depends(verify_token)):
@@ -148,9 +158,9 @@ async def get_feature_dependence(feature_name: str, token: str = Depends(verify_
 async def list_instances(sort_by: str = 'prediction', limit: int = 100, token: str = Depends(verify_token)):
     return handle_request(model_service.list_instances, sort_by, limit)
 
-@app.get("/analysis/dataset-comparison", tags=["Analysis"])
-async def get_dataset_comparison(token: str = Depends(verify_token)):
-    return handle_request(model_service.get_dataset_comparison)
+# @app.get("/analysis/dataset-comparison", tags=["Analysis"])
+# async def get_dataset_comparison(token: str = Depends(verify_token)):
+#     return handle_request(model_service.get_dataset_comparison)
 
 # --- New enterprise feature endpoints ---
 @app.get("/api/features", tags=["Features"])
