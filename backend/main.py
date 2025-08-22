@@ -1,14 +1,13 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Depends, Body
+from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from typing import Dict
-from typing import List
+from typing import Dict, List
 
 from app.core.config import settings
 from app.core.auth import verify_token
 from app.services.model_service import ModelService
 from app.services.ai_explanation_service import AIExplanationService
+from app.services.s3_service import S3Service
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
@@ -22,6 +21,7 @@ app.add_middleware(
 
 model_service = ModelService()
 ai_explanation_service = AIExplanationService()
+s3_service = S3Service()
 
 
 # Auto-load functionality disabled as requested by user
@@ -46,47 +46,79 @@ def handle_request(service_func, *args, **kwargs):
 def read_root():
     return {"message": f"Welcome to the {settings.PROJECT_NAME}"}
 
-@app.post("/upload/model-and-data", tags=["Setup"])
-async def upload_model_and_data(
-    token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
-    data_file: UploadFile = File(..., description="A .csv dataset file."),
-    target_column: str = Form(..., description="The name of the target variable column in the CSV.")
+@app.post("/load/model-and-data", tags=["Setup"])
+async def load_model_and_data_from_s3(
+    payload: Dict = Body(...),
+    token: str = Depends(verify_token)
 ):
-    model_path = os.path.join(settings.STORAGE_DIR, model_file.filename)
-    with open(model_path, "wb") as buffer:
-        buffer.write(await model_file.read())
+    """
+    Unified endpoint to load model and dataset(s) from S3 bucket. 
+    Supports both single dataset and separate train/test scenarios.
     
-    data_path = os.path.join(settings.STORAGE_DIR, data_file.filename)
-    with open(data_path, "wb") as buffer:
-        buffer.write(await data_file.read())
-
-    return handle_request(model_service.load_model_and_data, model_path, data_path, target_column)
-
-@app.post("/upload/model-and-separate-datasets", tags=["Setup"])
-async def upload_model_and_separate_datasets(
-    token: str = Depends(verify_token),
-    model_file: UploadFile = File(..., description="A scikit-learn model file (.joblib, .pkl, or .pickle)."),
-    train_file: UploadFile = File(..., description="Training dataset CSV file."),
-    test_file: UploadFile = File(..., description="Test dataset CSV file."),
-    target_column: str = Form(..., description="The name of the target variable column in both CSV files.")
-):
-    # Save model file
-    model_path = os.path.join(settings.STORAGE_DIR, model_file.filename)
-    with open(model_path, "wb") as buffer:
-        buffer.write(await model_file.read())
+    Expected payload for single dataset:
+    {
+        "model_s3_key": "path/to/model.joblib",
+        "data_s3_key": "path/to/dataset.csv",
+        "target_column": "target_variable_name"
+    }
     
-    # Save training dataset
-    train_path = os.path.join(settings.STORAGE_DIR, f"train_{train_file.filename}")
-    with open(train_path, "wb") as buffer:
-        buffer.write(await train_file.read())
-    
-    # Save test dataset
-    test_path = os.path.join(settings.STORAGE_DIR, f"test_{test_file.filename}")
-    with open(test_path, "wb") as buffer:
-        buffer.write(await test_file.read())
-
-    return handle_request(model_service.load_model_and_separate_datasets, model_path, train_path, test_path, target_column)
+    Expected payload for separate train/test datasets:
+    {
+        "model_s3_key": "path/to/model.joblib",
+        "train_s3_key": "path/to/train_dataset.csv",
+        "test_s3_key": "path/to/test_dataset.csv",
+        "target_column": "target_variable_name"
+    }
+    """
+    try:
+        model_s3_key = payload.get("model_s3_key")
+        data_s3_key = payload.get("data_s3_key")
+        train_s3_key = payload.get("train_s3_key")
+        test_s3_key = payload.get("test_s3_key")
+        target_column = payload.get("target_column")
+        
+        if not model_s3_key:
+            raise HTTPException(status_code=400, detail="Missing 'model_s3_key' in payload")
+        if not target_column:
+            raise HTTPException(status_code=400, detail="Missing 'target_column' in payload")
+        
+        # Validate input scenarios
+        if data_s3_key and (train_s3_key or test_s3_key):
+            raise HTTPException(status_code=400, detail="Provide either 'data_s3_key' OR 'train_s3_key'+'test_s3_key', not both")
+        
+        if not data_s3_key and not (train_s3_key and test_s3_key):
+            raise HTTPException(status_code=400, detail="Must provide either 'data_s3_key' OR both 'train_s3_key' and 'test_s3_key'")
+        
+        # Download files from S3 using unified function
+        download_result = s3_service.download_model_and_datasets(
+            model_s3_key=model_s3_key,
+            data_s3_key=data_s3_key,
+            train_s3_key=train_s3_key,
+            test_s3_key=test_s3_key
+        )
+        
+        # Check if download was successful
+        if not download_result or download_result[0] is None:
+            raise HTTPException(status_code=500, detail="Failed to download files from S3")
+        
+        # Use unified service method
+        if data_s3_key:
+            # Single dataset scenario
+            model_path, data_path = download_result
+            return handle_request(model_service.load_model_and_datasets, 
+                                model_path, data_path=data_path, target_column=target_column)
+        else:
+            # Separate datasets scenario
+            model_path, train_path, test_path = download_result
+            return handle_request(model_service.load_model_and_datasets, 
+                                model_path, train_data_path=train_path, test_data_path=test_path, target_column=target_column)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error loading from S3: {str(e)}")
 
 @app.get("/analysis/overview", tags=["Analysis"])
 async def get_overview(token: str = Depends(verify_token)):
