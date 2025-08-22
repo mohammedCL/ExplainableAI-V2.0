@@ -163,216 +163,240 @@ class BaseModelService:
         else:
             return "Unknown"
 
-    def load_model_and_data(self, model_path: str, data_path: str, target_column: str):
-        """Loads the model and dataset from local files and prepares for analysis."""
+    def load_model_and_datasets(self, model_path: str, data_path: str = None, train_data_path: str = None, test_data_path: str = None, target_column: Optional[str] = None):
+        """
+        Unified method to load model and dataset(s) from local files. 
+        Supports both single dataset and separate train/test scenarios.
+        
+        Args:
+            model_path: Path to the model file
+            data_path: Path to single dataset file (optional)
+            train_data_path: Path to training dataset file (optional)
+            test_data_path: Path to test dataset file (optional)
+            target_column: Name of the target column
+            
+        Returns:
+            Dict with loading results and model info
+        """
         try:
+            # Validate input parameters
+            if data_path and (train_data_path or test_data_path):
+                raise ValueError("Provide either data_path OR train_data_path+test_data_path, not both")
+            
+            if not data_path and not (train_data_path and test_data_path):
+                raise ValueError("Must provide either data_path OR both train_data_path and test_data_path")
+            
+            if not target_column:
+                raise ValueError("Target column must be specified")
+            
             # Load model
             model_wrapper = self._load_model_by_format(model_path)
             self.model = model_wrapper
             
-            # Load data
-            if not data_path.endswith('.csv'):
-                raise ValueError("Only CSV data files are supported.")
-            
-            df = pd.read_csv(data_path)
-            
-            if target_column not in df.columns:
-                raise ValueError(f"Target column '{target_column}' not found in dataset.")
-            
-            # Store metadata
-            self.model_info = {
-                'model_path': model_path,
-                'data_path': data_path,
-                'target_column': target_column,
-                'framework': self._detect_model_framework(model_wrapper),
-                'algorithm': self._get_model_algorithm(model_wrapper),
-                'version': '1.0.0',
-                'status': 'Active',
-                'created': pd.Timestamp.utcnow().isoformat(),
-                'last_trained': pd.Timestamp.utcnow().isoformat(),
-                'data_source': 'single_dataset'
-            }
-            
-            # Split features and target
-            X = df.drop(columns=[target_column])
-            y = df[target_column]
-            
-            # Store feature information
-            self.feature_names = X.columns.tolist()
-            self.target_name = target_column
-            
-            # Split into train/test (80/20 split)
-            from sklearn.model_selection import train_test_split
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42, stratify=y
-            )
-            
-            # Store datasets
-            self.X_train = X_train
-            self.y_train = y_train
-            self.X_test = X_test
-            self.y_test = y_test
-            
-            # For backward compatibility, point to training data
-            self.X_df = X_train
-            self.y_s = y_train
-            
-            # Update metadata with split information
-            self.model_info.update({
-                'train_samples': len(X_train),
-                'test_samples': len(X_test),
-                'missing_pct': (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100,
-                'duplicates_pct': (df.duplicated().sum() / len(df)) * 100,
-                'health_score_pct': 100.0 - self.model_info.get('missing_pct', 0) - self.model_info.get('duplicates_pct', 0)
-            })
-            
-            # Initialize SHAP explainer for tree-based models
-            try:
-                if model_wrapper.model_type == "sklearn" and hasattr(model_wrapper.model, 'tree_') or hasattr(model_wrapper.model, 'estimators_'):
-                    self.explainer = shap.TreeExplainer(model_wrapper.model)
-                    # Compute SHAP values on a sample for efficiency
-                    sample_size = min(1000, len(X_train))
-                    sample_X = X_train.sample(n=sample_size, random_state=42)
-                    self.shap_values = self.explainer.shap_values(sample_X)
-                    print(f"SHAP explainer initialized with {sample_size} samples.")
-                else:
-                    print("SHAP explainer not initialized (model type not supported or not tree-based)")
-            except Exception as e:
-                print(f"Failed to initialize SHAP explainer: {e}")
-                self.explainer = None
-                self.shap_values = None
-            
-            return {
-                "message": "Model and data loaded successfully",
-                "model_info": {
-                    "framework": self.model_info['framework'],
-                    "algorithm": self.model_info['algorithm'],
-                    "features": len(self.feature_names),
-                    "samples": len(df),
-                    "train_samples": len(X_train),
-                    "test_samples": len(X_test),
-                    "target_column": target_column,
-                    "shap_available": self.explainer is not None
-                }
-            }
-            
+            if data_path:
+                # Single dataset scenario
+                return self._load_single_dataset(model_wrapper, model_path, data_path, target_column)
+            else:
+                # Separate train/test datasets scenario
+                return self._load_separate_datasets(model_wrapper, model_path, train_data_path, test_data_path, target_column)
+                
         except Exception as e:
-            raise ValueError(f"Failed to load model and data: {str(e)}")
+            raise ValueError(f"Failed to load model and datasets: {str(e)}")
+    
+    def _load_single_dataset(self, model_wrapper: ModelWrapper, model_path: str, data_path: str, target_column: str):
+        """Load model with single dataset and split into train/test."""
+        # Load data
+        if not data_path.endswith('.csv'):
+            raise ValueError("Only CSV data files are supported.")
+        
+        df = pd.read_csv(data_path)
+        
+        if target_column not in df.columns:
+            raise ValueError(f"Target column '{target_column}' not found in dataset.")
+        
+        # Store metadata
+        self.model_info = {
+            'model_path': model_path,
+            'data_path': data_path,
+            'target_column': target_column,
+            'framework': self._detect_model_framework(model_wrapper),
+            'algorithm': self._get_model_algorithm(model_wrapper),
+            'version': '1.0.0',
+            'status': 'Active',
+            'created': pd.Timestamp.utcnow().isoformat(),
+            'last_trained': pd.Timestamp.utcnow().isoformat(),
+            'data_source': 'single_dataset'
+        }
+        
+        # Split features and target
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+        
+        # Store feature information
+        self.feature_names = X.columns.tolist()
+        self.target_name = target_column
+        
+        # Split into train/test (80/20 split)
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+        
+        # Store datasets
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        
+        # For backward compatibility, point to training data
+        self.X_df = X_train
+        self.y_s = y_train
+        
+        # Update metadata with split information
+        self.model_info.update({
+            'train_samples': len(X_train),
+            'test_samples': len(X_test),
+            'missing_pct': (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100,
+            'duplicates_pct': (df.duplicated().sum() / len(df)) * 100,
+            'health_score_pct': 100.0 - self.model_info.get('missing_pct', 0) - self.model_info.get('duplicates_pct', 0)
+        })
+        
+        # Initialize SHAP explainer
+        self._initialize_shap_explainer(model_wrapper, X_train)
+        
+        return {
+            "message": "Model and data loaded successfully",
+            "model_info": {
+                "framework": self.model_info['framework'],
+                "algorithm": self.model_info['algorithm'],
+                "features": len(self.feature_names),
+                "samples": len(df),
+                "train_samples": len(X_train),
+                "test_samples": len(X_test),
+                "target_column": target_column,
+                "shap_available": self.explainer is not None
+            }
+        }
+    
+    def _load_separate_datasets(self, model_wrapper: ModelWrapper, model_path: str, train_data_path: str, test_data_path: str, target_column: str):
+        """Load model with separate train and test datasets."""
+        # Load training data
+        if not train_data_path.endswith('.csv'):
+            raise ValueError("Only CSV data files are supported.")
+        
+        train_df = pd.read_csv(train_data_path)
+        
+        if target_column not in train_df.columns:
+            raise ValueError(f"Target column '{target_column}' not found in training dataset.")
+        
+        # Load test data
+        if not test_data_path.endswith('.csv'):
+            raise ValueError("Only CSV data files are supported.")
+        
+        test_df = pd.read_csv(test_data_path)
+        
+        if target_column not in test_df.columns:
+            raise ValueError(f"Target column '{target_column}' not found in test dataset.")
+        
+        # Store metadata
+        self.model_info = {
+            'model_path': model_path,
+            'train_data_path': train_data_path,
+            'test_data_path': test_data_path,
+            'target_column': target_column,
+            'framework': self._detect_model_framework(model_wrapper),
+            'algorithm': self._get_model_algorithm(model_wrapper),
+            'version': '1.0.0',
+            'status': 'Active',
+            'created': pd.Timestamp.utcnow().isoformat(),
+            'last_trained': pd.Timestamp.utcnow().isoformat(),
+            'data_source': 'separate_datasets'
+        }
+        
+        # Split features and target for training data
+        X_train = train_df.drop(columns=[target_column])
+        y_train = train_df[target_column]
+        
+        # Split features and target for test data
+        X_test = test_df.drop(columns=[target_column])
+        y_test = test_df[target_column]
+        
+        # Ensure feature consistency between train and test
+        if set(X_train.columns) != set(X_test.columns):
+            raise ValueError("Training and test datasets have different features.")
+        
+        # Reorder test features to match training order
+        X_test = X_test[X_train.columns]
+        
+        # Store feature information
+        self.feature_names = X_train.columns.tolist()
+        self.target_name = target_column
+        
+        # Store datasets
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        
+        # For backward compatibility, point to training data
+        self.X_df = X_train
+        self.y_s = y_train
+        
+        # Update metadata with dataset information
+        missing_train_pct = (train_df.isnull().sum().sum() / (train_df.shape[0] * train_df.shape[1])) * 100
+        missing_test_pct = (test_df.isnull().sum().sum() / (test_df.shape[0] * test_df.shape[1])) * 100
+        duplicates_train_pct = (train_df.duplicated().sum() / len(train_df)) * 100
+        duplicates_test_pct = (test_df.duplicated().sum() / len(test_df)) * 100
+        
+        self.model_info.update({
+            'train_samples': len(X_train),
+            'test_samples': len(X_test),
+            'missing_pct': (missing_train_pct + missing_test_pct) / 2,
+            'duplicates_pct': (duplicates_train_pct + duplicates_test_pct) / 2,
+            'health_score_pct': 100.0 - ((missing_train_pct + missing_test_pct) / 2) - ((duplicates_train_pct + duplicates_test_pct) / 2)
+        })
+        
+        # Initialize SHAP explainer
+        self._initialize_shap_explainer(model_wrapper, X_train)
+        
+        return {
+            "message": "Model and separate datasets loaded successfully",
+            "model_info": {
+                "framework": self.model_info['framework'],
+                "algorithm": self.model_info['algorithm'],
+                "features": len(self.feature_names),
+                "train_samples": len(X_train),
+                "test_samples": len(X_test),
+                "target_column": target_column,
+                "shap_available": self.explainer is not None
+            }
+        }
+    
+    def _initialize_shap_explainer(self, model_wrapper: ModelWrapper, X_train: pd.DataFrame):
+        """Initialize SHAP explainer for tree-based models."""
+        try:
+            if model_wrapper.model_type == "sklearn" and (hasattr(model_wrapper.model, 'tree_') or hasattr(model_wrapper.model, 'estimators_')):
+                self.explainer = shap.TreeExplainer(model_wrapper.model)
+                # Compute SHAP values on a sample for efficiency
+                sample_size = min(1000, len(X_train))
+                sample_X = X_train.sample(n=sample_size, random_state=42)
+                self.shap_values = self.explainer.shap_values(sample_X)
+                print(f"SHAP explainer initialized with {sample_size} samples.")
+            else:
+                print("SHAP explainer not initialized (model type not supported or not tree-based)")
+        except Exception as e:
+            print(f"Failed to initialize SHAP explainer: {e}")
+            self.explainer = None
+            self.shap_values = None
+
+    # Backward compatibility wrapper methods
+    def load_model_and_data(self, model_path: str, data_path: str, target_column: str):
+        """Legacy method for single dataset loading."""
+        return self.load_model_and_datasets(model_path, data_path=data_path, target_column=target_column)
 
     def load_model_and_separate_datasets(self, model_path: str, train_data_path: str, test_data_path: str, target_column: str):
-        """Loads the model and separate train/test datasets from local files and prepares for analysis."""
-        try:
-            # Load model
-            model_wrapper = self._load_model_by_format(model_path)
-            self.model = model_wrapper
-            
-            # Load training data
-            if not train_data_path.endswith('.csv'):
-                raise ValueError("Only CSV data files are supported.")
-            
-            train_df = pd.read_csv(train_data_path)
-            
-            if target_column not in train_df.columns:
-                raise ValueError(f"Target column '{target_column}' not found in training dataset.")
-            
-            # Load test data
-            if not test_data_path.endswith('.csv'):
-                raise ValueError("Only CSV data files are supported.")
-            
-            test_df = pd.read_csv(test_data_path)
-            
-            if target_column not in test_df.columns:
-                raise ValueError(f"Target column '{target_column}' not found in test dataset.")
-            
-            # Store metadata
-            self.model_info = {
-                'model_path': model_path,
-                'train_data_path': train_data_path,
-                'test_data_path': test_data_path,
-                'target_column': target_column,
-                'framework': self._detect_model_framework(model_wrapper),
-                'algorithm': self._get_model_algorithm(model_wrapper),
-                'version': '1.0.0',
-                'status': 'Active',
-                'created': pd.Timestamp.utcnow().isoformat(),
-                'last_trained': pd.Timestamp.utcnow().isoformat(),
-                'data_source': 'separate_datasets'
-            }
-            
-            # Split features and target for training data
-            X_train = train_df.drop(columns=[target_column])
-            y_train = train_df[target_column]
-            
-            # Split features and target for test data
-            X_test = test_df.drop(columns=[target_column])
-            y_test = test_df[target_column]
-            
-            # Ensure feature consistency between train and test
-            if set(X_train.columns) != set(X_test.columns):
-                raise ValueError("Training and test datasets have different features.")
-            
-            # Reorder test features to match training order
-            X_test = X_test[X_train.columns]
-            
-            # Store feature information
-            self.feature_names = X_train.columns.tolist()
-            self.target_name = target_column
-            
-            # Store datasets
-            self.X_train = X_train
-            self.y_train = y_train
-            self.X_test = X_test
-            self.y_test = y_test
-            
-            # For backward compatibility, point to training data
-            self.X_df = X_train
-            self.y_s = y_train
-            
-            # Update metadata with dataset information
-            missing_train_pct = (train_df.isnull().sum().sum() / (train_df.shape[0] * train_df.shape[1])) * 100
-            missing_test_pct = (test_df.isnull().sum().sum() / (test_df.shape[0] * test_df.shape[1])) * 100
-            duplicates_train_pct = (train_df.duplicated().sum() / len(train_df)) * 100
-            duplicates_test_pct = (test_df.duplicated().sum() / len(test_df)) * 100
-            
-            self.model_info.update({
-                'train_samples': len(X_train),
-                'test_samples': len(X_test),
-                'missing_pct': (missing_train_pct + missing_test_pct) / 2,
-                'duplicates_pct': (duplicates_train_pct + duplicates_test_pct) / 2,
-                'health_score_pct': 100.0 - ((missing_train_pct + missing_test_pct) / 2) - ((duplicates_train_pct + duplicates_test_pct) / 2)
-            })
-            
-            # Initialize SHAP explainer for tree-based models
-            try:
-                if model_wrapper.model_type == "sklearn" and (hasattr(model_wrapper.model, 'tree_') or hasattr(model_wrapper.model, 'estimators_')):
-                    self.explainer = shap.TreeExplainer(model_wrapper.model)
-                    # Compute SHAP values on a sample for efficiency
-                    sample_size = min(1000, len(X_train))
-                    sample_X = X_train.sample(n=sample_size, random_state=42)
-                    self.shap_values = self.explainer.shap_values(sample_X)
-                    print(f"SHAP explainer initialized with {sample_size} samples.")
-                else:
-                    print("SHAP explainer not initialized (model type not supported or not tree-based)")
-            except Exception as e:
-                print(f"Failed to initialize SHAP explainer: {e}")
-                self.explainer = None
-                self.shap_values = None
-            
-            return {
-                "message": "Model and separate datasets loaded successfully",
-                "model_info": {
-                    "framework": self.model_info['framework'],
-                    "algorithm": self.model_info['algorithm'],
-                    "features": len(self.feature_names),
-                    "train_samples": len(X_train),
-                    "test_samples": len(X_test),
-                    "target_column": target_column,
-                    "shap_available": self.explainer is not None
-                }
-            }
-            
-        except Exception as e:
-            raise ValueError(f"Failed to load model and separate datasets: {str(e)}")
+        """Legacy method for separate datasets loading."""
+        return self.load_model_and_datasets(model_path, train_data_path=train_data_path, test_data_path=test_data_path, target_column=target_column)
 
     def _get_classification_metrics(self, y_true, y_pred, y_proba=None):
         """Calculate classification metrics handling both binary and multiclass cases."""
