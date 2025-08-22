@@ -8,7 +8,7 @@ class Settings:
     STORAGE_DIR: str = os.path.join(os.getcwd(), "storage")
     
     # S3 Configuration for data and model storage
-    S3_ACCESS_TOKEN: str = os.getenv("S3_ACCESS_TOKEN", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0YXFpdWRkaW4ubW9oYW1tZWRAY2lycnVzbGFicy5pbyIsInVzZXJfaWQiOjQyLCJyb2xlcyI6W10sInBlcm1pc3Npb25zIjpbXSwiZXhwIjoxNzU2NDU3NzIxfQ.pUZZQE25KnAM_PQRB0KCSUbm38c1LLBX7gPkpfAa5Nw")
+    S3_ACCESS_TOKEN: str = os.getenv("S3_ACCESS_TOKEN")
     S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "http://xailoadbalancer-579761463.ap-south-1.elb.amazonaws.com/api/files_download/Classification")
     
     # AWS Bedrock Configuration
