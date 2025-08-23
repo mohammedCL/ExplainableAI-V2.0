@@ -7,7 +7,6 @@ from app.core.config import settings
 from app.core.auth import verify_token
 from app.services.model_service import ModelService
 from app.services.ai_explanation_service import AIExplanationService
-from app.services.s3_service import S3Service
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
@@ -21,7 +20,6 @@ app.add_middleware(
 
 model_service = ModelService()
 ai_explanation_service = AIExplanationService()
-s3_service = S3Service()
 
 
 # Auto-load functionality disabled as requested by user
@@ -46,87 +44,71 @@ def handle_request(service_func, *args, **kwargs):
 def read_root():
     return {"message": f"Welcome to the {settings.PROJECT_NAME}"}
 
-@app.get("/api/files", tags=["Setup"])
-async def list_files(token: str = Depends(verify_token)):
-    """Get available files from S3 bucket"""
-    try:
-        file_map = s3_service.get_file_list()
-        if not file_map:
-            raise HTTPException(status_code=500, detail="No files found in S3")
-        
-        models = [name for name in file_map.keys() if name.endswith(('.joblib', '.pkl', '.model'))]
-        datasets = [name for name in file_map.keys() if name.endswith('.csv')]
-        
-        return {"models": models, "datasets": datasets}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+from fastapi import APIRouter, Depends, HTTPException, requests
+from dotenv import load_dotenv
+import requests
+import os
 
-@app.post("/load", tags=["Setup"])
-async def load_data(payload: Dict = Body(...), token: str = Depends(verify_token)):
+
+
+@app.get("/api/files")
+def get_s3_file_metadata():
     """
-    Load model and dataset(s) from S3
-    
-    Single dataset:
-    {
-        "model": "model.joblib",
-        "dataset": "dataset.csv",
-        "target_column": "target"
-    }
-    
-    Train/Test datasets:
-    {
-        "model": "model.joblib", 
-        "train_dataset": "train.csv",
-        "test_dataset": "test.csv",
-        "target_column": "target"
-    }
+    Lists files and models from the external S3 API and returns their metadata (name, URL, folder).
+    Separates files and models based on the folder field.
     """
+    file_api = "http://xailoadbalancer-579761463.ap-south-1.elb.amazonaws.com/api/files_download"
+    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0YXFpdWRkaW4ubW9oYW1tZWRAY2lycnVzbGFicy5pbyIsInVzZXJfaWQiOjQyLCJyb2xlcyI6W10sInBlcm1pc3Npb25zIjpbXSwiZXhwIjoxNzU2NDY0MDE1fQ.gOHN21A5reYZX0QzcoJg3BFqU3BzeqEkJaYR4KOf9_0"
+    EXTERNAL_S3_API_URL = f"{file_api}/Classification"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
     try:
-        model_name = payload.get("model")
-        dataset_name = payload.get("dataset")
-        train_dataset = payload.get("train_dataset")
-        test_dataset = payload.get("test_dataset")
-        target_column = payload.get("target_column", "target")
+        response = requests.get(EXTERNAL_S3_API_URL, headers=headers)
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        json_data = response.json()
+        all_items = json_data.get("files", [])
         
+        # Separate files and models based on folder
+        files = [item for item in all_items if item.get("folder") == "files"]
+        models = [item for item in all_items if item.get("folder") == "models"]
+        
+        return {
+            "files": files,
+            "models": models
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error connecting to external S3 API: {e}")
+        return None
+    except Exception as e:
+        print(f"Error processing external S3 API response: {e}")
+        return None
+
+from typing import Dict
+from fastapi import APIRouter, Depends, Body, HTTPException
+from pydantic import BaseModel
+
+class LoadDataRequest(BaseModel):
+    model: str
+    train_dataset: str = None
+    test_dataset: str = None
+    target_column: str = "target"
+
+
+@app.post("/load")
+async def load_data(payload: LoadDataRequest):
+    
+    try:
+        model_name = payload.model
+        train_dataset = payload.train_dataset
+        test_dataset = payload.test_dataset
+        target_column = payload.target_column
+
         if not model_name:
             raise HTTPException(status_code=400, detail="Missing model name")
-        
-        # Check which scenario we're in
-        if dataset_name:
-            # Single dataset scenario
-            download_result = s3_service.download_model_and_datasets(
-                model_s3_key=model_name,
-                data_s3_key=dataset_name
-            )
-            
-            if not download_result:
-                raise HTTPException(status_code=500, detail="Failed to download files")
-            
-            model_path, data_path = download_result
-            return handle_request(model_service.load_model_and_datasets, 
-                                model_path, data_path=data_path, target_column=target_column)
-        
-        elif train_dataset and test_dataset:
-            # Train/Test datasets scenario
-            download_result = s3_service.download_model_and_datasets(
-                model_s3_key=model_name,
-                train_s3_key=train_dataset,
-                test_s3_key=test_dataset
-            )
-            
-            if not download_result:
-                raise HTTPException(status_code=500, detail="Failed to download files")
-            
-            model_path, train_path, test_path = download_result
-            return handle_request(model_service.load_model_and_datasets, 
-                                model_path, train_data_path=train_path, test_data_path=test_path, target_column=target_column)
-        
-        else:
-            raise HTTPException(status_code=400, detail="Provide either 'dataset' OR both 'train_dataset' and 'test_dataset'")
-        
-    except HTTPException:
-        raise
+
+        return handle_request(model_service.load_model_and_datasets, model_path=model_name, train_data_path=train_dataset, test_data_path=test_dataset, target_column=target_column)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
