@@ -163,7 +163,7 @@ class BaseModelService:
         else:
             return "Unknown"
 
-    def load_model_and_datasets(self, model_path: str, data_path: str = None, train_data_path: str = None, test_data_path: str = None, target_column: str = ""):
+    def load_model_and_datasets(self, model_path: str, data_path: str = None, train_data_path: str = None, test_data_path: str = None, target_column: Optional[str] = None):
         """
         Unified method to load model and dataset(s) from local files. 
         Supports both single dataset and separate train/test scenarios.
