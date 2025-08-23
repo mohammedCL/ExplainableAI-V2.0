@@ -43,11 +43,11 @@ class S3Service:
                         if folder:
                             file_map[f"{folder}/{file_name}"] = download_url
                             
-            print(f"📋 Found {len(file_map)} files in S3 bucket")
+            logging.info(f"📋 Found {len(file_map)} files in S3 bucket")
             return file_map
             
         except Exception as e:
-            print(f"❌ Failed to get file list: {str(e)}")
+            logging.error(f"❌ Failed to get file list: {str(e)}")
             return {}
 
     def download_file(self, s3_key: str, local_path: str) -> bool:
