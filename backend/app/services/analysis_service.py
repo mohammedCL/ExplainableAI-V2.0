@@ -19,8 +19,8 @@ class AnalysisService:
         self.base._is_ready()
         
         # Calculate performance metrics on training data
-        y_pred_train = self.base.model.predict(self.base.X_train.values)
-        y_proba_train = self.base.model.predict_proba(self.base.X_train.values)
+        y_pred_train = self.base.model.predict(self.base.X_train)
+        y_proba_train = self.base.model.predict_proba(self.base.X_train)
         
         train_metrics, is_binary = self.base._get_classification_metrics(
             self.base.y_train, y_pred_train, y_proba_train
@@ -30,8 +30,8 @@ class AnalysisService:
         test_metrics = None
         overfitting_score = 0.0
         if self.base.X_test is not None and self.base.y_test is not None:
-            y_pred_test = self.base.model.predict(self.base.X_test.values)
-            y_proba_test = self.base.model.predict_proba(self.base.X_test.values)
+            y_pred_test = self.base.model.predict(self.base.X_test)
+            y_proba_test = self.base.model.predict_proba(self.base.X_test)
             
             test_metrics, _ = self.base._get_classification_metrics(
                 self.base.y_test, y_pred_test, y_proba_test
@@ -109,55 +109,127 @@ class AnalysisService:
 
     def get_classification_stats(self) -> Dict[str, Any]:
         """Get detailed classification statistics and confusion matrix."""
-        self.base._is_ready()
+        import json
+        import traceback
         
-        # Use test data if available, otherwise fall back to training data
-        if self.base.X_test is not None and self.base.y_test is not None:
-            X_eval, y_eval = self.base.X_test, self.base.y_test
-            data_source = "test"
-        else:
-            X_eval, y_eval = self.base.X_train, self.base.y_train
-            data_source = "train"
+        try:
+            print("🔍 Starting classification stats calculation...")
+            self.base._is_ready()
             
-        y_pred = self.base.safe_predict(X_eval)
-        y_proba = self.base.safe_predict_proba(X_eval)
-        
-        metrics, is_binary = self.base._get_classification_metrics(y_eval, y_pred, y_proba)
-        
-        cm = confusion_matrix(y_eval, y_pred)
-        
-        # ROC curve only for binary classification
-        roc_curve_data = {}
-        if is_binary and y_proba is not None:
-            fpr, tpr, thresholds = roc_curve(y_eval, y_proba[:, 1])
-            roc_curve_data = {
-                "fpr": fpr.tolist(),
-                "tpr": tpr.tolist(),
-                "thresholds": thresholds.tolist()
-            }
+            # Use test data if available, otherwise fall back to training data
+            if self.base.X_test is not None and self.base.y_test is not None:
+                X_eval, y_eval = self.base.X_test, self.base.y_test
+                data_source = "test"
+                print(f"📊 Using test data: {X_eval.shape}")
+            else:
+                X_eval, y_eval = self.base.X_train, self.base.y_train
+                data_source = "train"
+                print(f"📊 Using train data: {X_eval.shape}")
+                
+            print(f"🎯 Target values: unique={np.unique(y_eval)}, shape={y_eval.shape}")
+            
+            y_pred = self.base.safe_predict(X_eval)
+            print(f"🔮 Predictions: unique={np.unique(y_pred)}, shape={y_pred.shape}")
+            
+            y_proba = self.base.safe_predict_proba(X_eval)
+            print(f"📈 Probabilities: shape={y_proba.shape if y_proba is not None else None}")
+            
+            metrics, is_binary = self.base._get_classification_metrics(y_eval, y_pred, y_proba)
+            print(f"📏 Calculated metrics: {metrics}")
+            
+            # Test JSON serialization of metrics
+            try:
+                metrics_json = json.dumps(metrics)
+                print("✅ Metrics JSON serializable")
+            except Exception as e:
+                print(f"❌ Metrics NOT JSON serializable: {e}")
+                print(f"🔍 Problematic metrics: {metrics}")
+                # Find the problematic values
+                for key, value in metrics.items():
+                    try:
+                        json.dumps({key: value})
+                    except Exception as ve:
+                        print(f"❌ Problematic metric '{key}': {value} (type: {type(value)}) - {ve}")
+                
+            cm = confusion_matrix(y_eval, y_pred)
+            print(f"🏛️ Confusion matrix shape: {cm.shape}")
+            
+            # ROC curve only for binary classification
+            roc_curve_data = {}
+            if is_binary and y_proba is not None:
+                try:
+                    fpr, tpr, thresholds = roc_curve(y_eval, y_proba[:, 1])
+                    roc_curve_data = {
+                        "fpr": fpr.tolist(),
+                        "tpr": tpr.tolist(),
+                        "thresholds": thresholds.tolist()
+                    }
+                    print(f"📊 ROC curve data: fpr={len(fpr)}, tpr={len(tpr)}, thresholds={len(thresholds)}")
+                    
+                    # Test JSON serialization of ROC data
+                    try:
+                        roc_json = json.dumps(roc_curve_data)
+                        print("✅ ROC data JSON serializable")
+                    except Exception as e:
+                        print(f"❌ ROC data NOT JSON serializable: {e}")
+                        
+                except Exception as e:
+                    print(f"❌ Error calculating ROC curve: {e}")
+                    traceback.print_exc()
 
-        # Convert confusion matrix to standard format
-        if cm.shape == (2, 2):
-            confusion_matrix_dict = {
-                "true_negative": int(cm[0, 0]),
-                "false_positive": int(cm[0, 1]),
-                "false_negative": int(cm[1, 0]),
-                "true_positive": int(cm[1, 1])
-            }
-        else:
-            # Multi-class confusion matrix
-            confusion_matrix_dict = {
-                "matrix": cm.tolist(),
-                "classes": sorted(np.unique(y_eval).tolist())
-            }
+            # Convert confusion matrix to standard format
+            if cm.shape == (2, 2):
+                confusion_matrix_dict = {
+                    "true_negative": int(cm[0, 0]),
+                    "false_positive": int(cm[0, 1]),
+                    "false_negative": int(cm[1, 0]),
+                    "true_positive": int(cm[1, 1])
+                }
+            else:
+                # Multi-class confusion matrix
+                confusion_matrix_dict = {
+                    "matrix": cm.tolist(),
+                    "classes": sorted(np.unique(y_eval).tolist())
+                }
+                
+            print(f"🏛️ Confusion matrix dict: {confusion_matrix_dict}")
+            
+            # Test JSON serialization of confusion matrix
+            try:
+                cm_json = json.dumps(confusion_matrix_dict)
+                print("✅ Confusion matrix JSON serializable")
+            except Exception as e:
+                print(f"❌ Confusion matrix NOT JSON serializable: {e}")
 
-        return {
-            "metrics": metrics,
-            "data_source": data_source,
-            "confusion_matrix": confusion_matrix_dict,
-            "roc_curve": roc_curve_data,
-            "classification_type": "binary" if is_binary else "multiclass"
-        }
+            result = {
+                "metrics": metrics,
+                "data_source": data_source,
+                "confusion_matrix": confusion_matrix_dict,
+                "roc_curve": roc_curve_data,
+                "classification_type": "binary" if is_binary else "multiclass"
+            }
+            
+            # Test JSON serialization of final result
+            try:
+                result_json = json.dumps(result)
+                print("✅ Final result JSON serializable")
+            except Exception as e:
+                print(f"❌ Final result NOT JSON serializable: {e}")
+                # Find problematic parts
+                for key, value in result.items():
+                    try:
+                        json.dumps({key: value})
+                        print(f"✅ Result section '{key}' is JSON serializable")
+                    except Exception as ve:
+                        print(f"❌ Result section '{key}' NOT JSON serializable: {ve}")
+                        print(f"🔍 Value: {value}")
+                        
+            return result
+            
+        except Exception as e:
+            print(f"💥 Error in get_classification_stats: {e}")
+            traceback.print_exc()
+            raise
 
     def list_instances(self, sort_by: str = "prediction", limit: int = 100) -> Dict[str, Any]:
         """Return lightweight list of instances to populate selector UI."""

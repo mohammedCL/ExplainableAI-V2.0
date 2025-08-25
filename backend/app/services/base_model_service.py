@@ -545,49 +545,89 @@ class BaseModelService:
         except Exception:
             return value
 
+    def _sanitize_metrics(self, metrics: dict) -> dict:
+        """Sanitize metrics to ensure JSON serialization compatibility."""
+        import math
+        
+        sanitized = {}
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                if math.isnan(value) or math.isinf(value):
+                    sanitized[key] = 0.0  # Replace NaN/inf with 0.0
+                else:
+                    sanitized[key] = float(value)
+            else:
+                sanitized[key] = value
+        return sanitized
+
     def _get_classification_metrics(self, y_true, y_pred, y_proba=None):
         """Calculate classification metrics handling both binary and multiclass cases."""
         from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
         import numpy as np
         
-        # Determine if binary or multiclass
-        unique_classes = np.unique(y_true)
-        is_binary = len(unique_classes) == 2
-        
-        if is_binary:
-            # Binary classification
-            metrics = {
-                "accuracy": float(accuracy_score(y_true, y_pred)),
-                "precision": float(precision_score(y_true, y_pred, average='binary')),
-                "recall": float(recall_score(y_true, y_pred, average='binary')),
-                "f1_score": float(f1_score(y_true, y_pred, average='binary'))
-            }
-            # Add AUC for binary classification if probabilities are provided
-            if y_proba is not None:
-                if y_proba.ndim == 2 and y_proba.shape[1] >= 2:
-                    metrics["auc"] = float(roc_auc_score(y_true, y_proba[:, 1]))
-                elif y_proba.ndim == 1:
-                    metrics["auc"] = float(roc_auc_score(y_true, y_proba))
+        try:
+            # Determine if binary or multiclass
+            unique_classes = np.unique(y_true)
+            is_binary = len(unique_classes) == 2
+            
+            if is_binary:
+                # Binary classification with zero_division handling
+                metrics = {
+                    "accuracy": accuracy_score(y_true, y_pred),
+                    "precision": precision_score(y_true, y_pred, average='binary', zero_division=0),
+                    "recall": recall_score(y_true, y_pred, average='binary', zero_division=0),
+                    "f1_score": f1_score(y_true, y_pred, average='binary', zero_division=0)
+                }
+                
+                # Add AUC for binary classification if probabilities are provided
+                if y_proba is not None:
+                    try:
+                        if y_proba.ndim == 2 and y_proba.shape[1] >= 2:
+                            metrics["auc"] = roc_auc_score(y_true, y_proba[:, 1])
+                        elif y_proba.ndim == 1:
+                            metrics["auc"] = roc_auc_score(y_true, y_proba)
+                        else:
+                            metrics["auc"] = 0.0
+                    except Exception as e:
+                        print(f"Warning: Could not calculate AUC for binary classification: {e}")
+                        metrics["auc"] = 0.0
                 else:
                     metrics["auc"] = 0.0
-        else:
-            # Multiclass classification
-            metrics = {
-                "accuracy": float(accuracy_score(y_true, y_pred)),
-                "precision": float(precision_score(y_true, y_pred, average='weighted')),
-                "recall": float(recall_score(y_true, y_pred, average='weighted')),
-                "f1_score": float(f1_score(y_true, y_pred, average='weighted'))
-            }
-            # For multiclass, use macro-averaged AUC if probabilities are provided
-            if y_proba is not None and y_proba.ndim == 2 and y_proba.shape[1] >= 2:
-                try:
-                    metrics["auc"] = float(roc_auc_score(y_true, y_proba, multi_class='ovr', average='macro'))
-                except Exception:
-                    metrics["auc"] = 0.0
+                    
             else:
-                metrics["auc"] = 0.0
+                # Multiclass classification with zero_division handling
+                metrics = {
+                    "accuracy": accuracy_score(y_true, y_pred),
+                    "precision": precision_score(y_true, y_pred, average='weighted', zero_division=0),
+                    "recall": recall_score(y_true, y_pred, average='weighted', zero_division=0),
+                    "f1_score": f1_score(y_true, y_pred, average='weighted', zero_division=0)
+                }
                 
-        return metrics, is_binary
+                # For multiclass, use macro-averaged AUC if probabilities are provided
+                if y_proba is not None and y_proba.ndim == 2 and y_proba.shape[1] >= 2:
+                    try:
+                        metrics["auc"] = roc_auc_score(y_true, y_proba, multi_class='ovr', average='macro')
+                    except Exception as e:
+                        print(f"Warning: Could not calculate AUC for multiclass classification: {e}")
+                        metrics["auc"] = 0.0
+                else:
+                    metrics["auc"] = 0.0
+            
+            # Sanitize all metrics to ensure JSON compatibility
+            metrics = self._sanitize_metrics(metrics)
+            return metrics, is_binary
+            
+        except Exception as e:
+            print(f"Error calculating classification metrics: {e}")
+            # Return default metrics if calculation fails
+            default_metrics = {
+                "accuracy": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "auc": 0.0
+            }
+            return default_metrics, True  # Assume binary for fallback
 
     def _get_shap_matrix(self, X: Optional[pd.DataFrame] = None) -> np.ndarray:
         """Return SHAP values as a 2D array shaped (n_samples, n_features) for analysis.

@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
+import numpy as np
+import math
 
 from app.core.config import settings
 from app.core.auth import verify_token
@@ -25,16 +27,69 @@ ai_explanation_service = AIExplanationService()
 # Auto-load functionality disabled as requested by user
 # User will upload model and dataset through the frontend interface
 
+def sanitize_for_json(obj):
+    """Recursively sanitize an object to ensure JSON serialization compatibility."""
+    if obj is None:
+        return None
+    elif isinstance(obj, (bool, str)):
+        return obj
+    elif isinstance(obj, (int, float)):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0
+        return float(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return sanitize_for_json(obj.tolist())
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: sanitize_for_json(value) for key, value in obj.items()}
+    else:
+        # For any other type, try to convert to string
+        return str(obj)
+
 # --- Utility Function for Error Handling ---
 def handle_request(service_func, *args, **kwargs):
+    import json
+    import traceback
+    
     try:
         result = service_func(*args, **kwargs)
-        return JSONResponse(status_code=200, content=result)
+        
+        # Sanitize the result before JSON serialization
+        sanitized_result = sanitize_for_json(result)
+        
+        # Test JSON serialization
+        try:
+            json_str = json.dumps(sanitized_result)
+            print(f"✅ Service result successfully serialized to JSON ({len(json_str)} characters)")
+        except (TypeError, ValueError) as json_error:
+            print(f"❌ JSON serialization error even after sanitization: {json_error}")
+            print(f"🔍 Result type: {type(sanitized_result)}")
+            
+            # Find problematic parts in the sanitized result
+            if isinstance(sanitized_result, dict):
+                for key, value in sanitized_result.items():
+                    try:
+                        json.dumps({key: value})
+                    except Exception as e:
+                        print(f"❌ Problematic key '{key}': {value} (type: {type(value)}) - {e}")
+            
+            raise ValueError(f"Response contains values that cannot be serialized to JSON: {json_error}")
+        
+        return JSONResponse(status_code=200, content=sanitized_result)
+        
     except ValueError as e:
+        print(f"❌ ValueError in handle_request: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # For debugging, print the full error
-        import traceback
+        print(f"💥 Unexpected error in handle_request: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
 
