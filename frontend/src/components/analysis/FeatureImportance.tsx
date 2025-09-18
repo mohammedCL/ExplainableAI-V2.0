@@ -304,7 +304,7 @@ const FeatureImportance: React.FC<{ modelType?: string }> = () => {
                                     <tr key={f.name} className="border-t border-gray-200 dark:border-gray-700">
                                         <td className="p-2">{f.rank}</td>
                                         <td className="p-2">{f.name}</td>
-                                        <td className="p-2 font-mono">{f.importance_score.toFixed(4)}</td>
+                                        <td className="p-2 font-mono">{typeof f.importance === 'number' ? f.importance.toFixed(4) : ''}</td>
                                         <td className="p-2">
                                             <span className={`px-2 py-0.5 rounded text-xs ${f.impact_direction === 'positive' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{f.impact_direction}</span>
                                         </td>

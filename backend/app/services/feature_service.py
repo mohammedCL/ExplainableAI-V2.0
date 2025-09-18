@@ -119,8 +119,8 @@ class FeatureService:
         self._correlation_cache[cache_key] = payload
         return payload
 
-    def compute_feature_importance_advanced(self, method: str = 'shap', sort_by: str = 'importance', 
-                                          top_n: int = 20, visualization: str = 'bar') -> Dict[str, Any]:
+    def compute_feature_importance_advanced(self, method: str = 'shap', sort_by: str = 'importance',
+                                        top_n: int = 20, visualization: str = 'bar') -> Dict[str, Any]:
         """Compute advanced feature importance with detailed analysis."""
         self.base._is_ready()
         
@@ -129,17 +129,25 @@ class FeatureService:
         if key in self._importance_cache:
             return self._importance_cache[key]
 
+        # Extra debug: Print a sample of X_train, feature names, and model predictions
+        try:
+            print("[DEBUG] X_train sample:")
+            print(self.base.X_train.head())
+            print(f"[DEBUG] Feature names: {self.base.feature_names}")
+            preds = self.base.model.predict(self.base.X_train.head())
+            print(f"[DEBUG] Model predictions on X_train sample: {preds}")
+        except Exception as e:
+            print(f"[DEBUG] Error printing X_train/model info: {e}")
+
         method = method.lower()
         if method == 'shap':
             if self.base.shap_values is None:
                 raise ValueError("SHAP values not available for this model.")
-            
             shap_vals = self.base._get_shap_values_for_analysis()
             if shap_vals is not None:
                 raw_importance = np.abs(shap_vals).mean(axis=0)
             else:
                 raise ValueError("Failed to compute SHAP-based feature importance.")
-                
         elif method in ('permutation', 'gain', 'builtin'):
             if hasattr(self.base.model, 'feature_importances_'):
                 raw_importance = self.base.model.feature_importances_
@@ -147,6 +155,12 @@ class FeatureService:
                 raise ValueError(f"Model doesn't support {method} feature importance.")
         else:
             raise ValueError(f"Unsupported importance method: {method}")
+
+        # Debug: Print raw importance values for inspection
+        print(f"[DEBUG] Feature importance method: {method}")
+        print(f"[DEBUG] Raw importance values: {raw_importance}")
+        if hasattr(self.base, 'feature_names'):
+            print(f"[DEBUG] Feature names: {self.base.feature_names}")
 
         items = []
         for idx, name in enumerate(self.base.feature_names):
@@ -185,7 +199,7 @@ class FeatureService:
         
         self._importance_cache[key] = payload
         return payload
-
+    
     def get_feature_interactions(self, feature1: str, feature2: str) -> Dict[str, Any]:
         """Get feature interaction analysis (simplified version)."""
         self.base._is_ready()

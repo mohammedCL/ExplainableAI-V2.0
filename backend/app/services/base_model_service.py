@@ -432,6 +432,7 @@ class BaseModelService:
                     try:
                         # Fallback to general explainer
                         sample_size = min(100, len(self.X_train))
+                        print(f"[DEBUG] SHAP fallback: using {sample_size} samples for background data (shap.Explainer)")
                         background_data = self.X_train.values[:sample_size]
                         self.explainer = shap.Explainer(model_wrapper.predict_proba, background_data)
                     except Exception as e2:
@@ -439,6 +440,7 @@ class BaseModelService:
                         try:
                             # Try KernelExplainer as final fallback
                             sample_size = min(50, len(self.X_train))
+                            print(f"[DEBUG] SHAP fallback: using {sample_size} samples for background data (KernelExplainer)")
                             background_data = self.X_train.values[:sample_size]
                             self.explainer = shap.KernelExplainer(model_wrapper.predict_proba, background_data)
                         except Exception as e3:
@@ -449,6 +451,7 @@ class BaseModelService:
                 try:
                     # Use a smaller sample for initialization to avoid memory issues
                     sample_size = min(50, len(self.X_train))
+                    print(f"[DEBUG] SHAP fallback: using {sample_size} samples for background data (shap.Explainer, non-sklearn)")
                     background_data = self.X_train.values[:sample_size]
                     self.explainer = shap.Explainer(model_wrapper.predict_proba, background_data)
                 except Exception as e:
@@ -456,6 +459,7 @@ class BaseModelService:
                     try:
                         # Try with even smaller sample
                         sample_size = min(10, len(self.X_train))
+                        print(f"[DEBUG] SHAP fallback: using {sample_size} samples for background data (KernelExplainer, non-sklearn)")
                         background_data = self.X_train.values[:sample_size]
                         self.explainer = shap.KernelExplainer(model_wrapper.predict_proba, background_data)
                     except Exception as e2:
@@ -468,6 +472,7 @@ class BaseModelService:
                     print("Computing SHAP values...")
                     # Use a small sample for SHAP values to avoid memory/computation issues
                     sample_size = min(100, len(self.X_train))
+                    print(f"[DEBUG] Calculating SHAP values for {sample_size} samples.")
                     self.shap_values = self.explainer.shap_values(self.X_train.values[:sample_size])
                     print(f"SHAP explainer created successfully with sample size {sample_size}.")
                     
