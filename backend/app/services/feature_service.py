@@ -5,6 +5,64 @@ from .base_model_service import BaseModelService
 
 
 class FeatureService:
+    import hashlib
+    import time
+
+    def generate_data_fingerprint(self) -> str:
+        """Generate a unique fingerprint for the current dataset."""
+        try:
+            data_structure = f"{self.base.X_train.shape}|{list(self.base.X_train.columns)}"
+            data_sample = pd.util.hash_pandas_object(self.base.X_train.head(100)).values
+            fingerprint_input = f"{data_structure}|{data_sample.tobytes()}"
+            return self.hashlib.md5(fingerprint_input.encode()).hexdigest()[:12]
+        except Exception:
+            return self.hashlib.md5(f"{self.base.X_train.shape}".encode()).hexdigest()[:12]
+
+    def generate_model_fingerprint(self) -> str:
+        """Generate a unique fingerprint for the current model."""
+        try:
+            model_params = str(sorted(self.base.model.get_params().items()))
+            model_type = type(self.base.model).__name__
+            fingerprint_input = f"{model_type}|{model_params}"
+            return self.hashlib.md5(fingerprint_input.encode()).hexdigest()[:12]
+        except Exception:
+            model_type = type(self.base.model).__name__
+            return self.hashlib.md5(model_type.encode()).hexdigest()[:12]
+
+    def _is_cache_valid(self, cache_entry: Dict[str, Any]) -> bool:
+        """Check if cache entry is still valid."""
+        try:
+            ttl_config = {
+                'shap': 1800,       # 30 minutes
+                'gain': 300,        # 5 minutes
+                'builtin': 300,     # 5 minutes
+                'permutation': 900  # 15 minutes
+            }
+            elapsed = self.time.time() - cache_entry['timestamp']
+            ttl = ttl_config.get(cache_entry.get('method', ''), 600)
+            if elapsed >= ttl:
+                return False
+            current_data_fp = self.generate_data_fingerprint()
+            current_model_fp = self.generate_model_fingerprint()
+            return (cache_entry['data_fingerprint'] == current_data_fp and
+                    cache_entry['model_fingerprint'] == current_model_fp)
+        except Exception:
+            return False
+
+    def _cleanup_stale_cache(self):
+        """Remove stale cache entries."""
+        try:
+            current_data_fp = self.generate_data_fingerprint()
+            current_model_fp = self.generate_model_fingerprint()
+            keys_to_remove = []
+            for key, entry in self._importance_cache.items():
+                if (entry.get('data_fingerprint') != current_data_fp or
+                    entry.get('model_fingerprint') != current_model_fp):
+                    keys_to_remove.append(key)
+            for key in keys_to_remove:
+                del self._importance_cache[key]
+        except Exception:
+            pass
     """
     Service for feature-related operations like feature importance, metadata,
     correlation analysis, and feature interactions.
@@ -123,11 +181,23 @@ class FeatureService:
                                         top_n: int = 20, visualization: str = 'bar') -> Dict[str, Any]:
         """Compute advanced feature importance with detailed analysis."""
         self.base._is_ready()
-        
-        # Normalize params for cache key
-        key = f"{method}|{sort_by}|{top_n}|{visualization}"
-        if key in self._importance_cache:
-            return self._importance_cache[key]
+
+        # Generate fingerprints for cache key
+        data_fp = self.generate_data_fingerprint()
+        model_fp = self.generate_model_fingerprint()
+        cache_key = f"{method}|{sort_by}|{top_n}|{visualization}|{data_fp}|{model_fp}"
+
+        # Check cache first
+        if cache_key in self._importance_cache:
+            cache_entry = self._importance_cache[cache_key]
+            if self._is_cache_valid(cache_entry):
+                return cache_entry['result']
+            else:
+                del self._importance_cache[cache_key]
+
+        # Clean up stale cache entries periodically
+        if len(self._importance_cache) > 10:
+            self._cleanup_stale_cache()
 
         # Extra debug: Print a sample of X_train, feature names, and model predictions
         try:
@@ -156,7 +226,6 @@ class FeatureService:
         else:
             raise ValueError(f"Unsupported importance method: {method}")
 
-        # Debug: Print raw importance values for inspection
         print(f"[DEBUG] Feature importance method: {method}")
         print(f"[DEBUG] Raw importance values: {raw_importance}")
         if hasattr(self.base, 'feature_names'):
@@ -166,28 +235,25 @@ class FeatureService:
         for idx, name in enumerate(self.base.feature_names):
             importance = float(raw_importance[idx])
             impact_direction = 'positive' if importance >= 0 else 'negative'
-            
             items.append({
                 "name": name,
                 "importance": importance,
                 "impact_direction": impact_direction,
-                "rank": 0  # Will be set after sorting
+                "rank": 0
             })
 
-        # Sorting
         if sort_by == 'feature_name':
             items.sort(key=lambda x: x['name'])
         elif sort_by == 'impact':
             items.sort(key=lambda x: abs(x['importance']), reverse=True)
-        else:            
+        else:
             items.sort(key=lambda x: x['importance'], reverse=True)
 
-        # Assign ranks after sort
         for i, it in enumerate(items):
             it['rank'] = i + 1
 
         top_items = items[:int(top_n)]
-        
+
         payload = {
             "total_features": len(items),
             "positive_impact_count": sum(1 for i in items if i['impact_direction'] == 'positive'),
@@ -196,8 +262,17 @@ class FeatureService:
             "computation_method": method,
             "computed_at": pd.Timestamp.utcnow().isoformat()
         }
-        
-        self._importance_cache[key] = payload
+
+        cache_entry = {
+            'result': payload,
+            'timestamp': self.time.time(),
+            'method': method,
+            'data_fingerprint': data_fp,
+            'model_fingerprint': model_fp,
+            'data_shape': self.base.X_train.shape,
+            'feature_count': len(self.base.feature_names)
+        }
+        self._importance_cache[cache_key] = cache_entry
         return payload
     
     def get_feature_interactions(self, feature1: str, feature2: str) -> Dict[str, Any]:
