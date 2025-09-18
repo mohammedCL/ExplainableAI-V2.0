@@ -113,7 +113,7 @@ def get_s3_file_metadata():
     Separates files and models based on the folder field.
     """
     file_api = "http://xailoadbalancer-579761463.ap-south-1.elb.amazonaws.com/api/files_download"
-    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0YXFpdWRkaW4ubW9oYW1tZWRAY2lycnVzbGFicy5pbyIsInVzZXJfaWQiOjQyLCJyb2xlcyI6W10sInBlcm1pc3Npb25zIjpbXSwiZXhwIjoxNzU2NDY0MDE1fQ.gOHN21A5reYZX0QzcoJg3BFqU3BzeqEkJaYR4KOf9_0"
+    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0YXFpdWRkaW4ubW9oYW1tZWRAY2lycnVzbGFicy5pbyIsInVzZXJfaWQiOjQyLCJyb2xlcyI6W10sInBlcm1pc3Npb25zIjpbXSwiZXhwIjoxNzU3MDc5NDA0fQ.xOuA3zFw7-qjiTTI5Fl0cU0-2YWRbAkgKTFQCpJH76Y"
     EXTERNAL_S3_API_URL = f"{file_api}/Classification"
     headers = {
         "Authorization": f"Bearer {token}"

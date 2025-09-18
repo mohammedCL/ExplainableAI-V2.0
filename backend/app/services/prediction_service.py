@@ -140,8 +140,56 @@ class PredictionService:
                 "prediction_probability": prediction_prob,
                 "predicted_class": prediction_class,
                 "feature_values": base_instance.to_dict(),
-                "shap_explanations": shap_explanation
+                "shap_explanations": shap_explanation,
+                "feature_ranges": self._get_feature_ranges()
             }
             
         except Exception as e:
             raise ValueError(f"What-if analysis failed: {str(e)}")
+
+    def _get_feature_ranges(self) -> Dict[str, Any]:
+        """Get feature ranges and metadata for what-if analysis."""
+        self.base._is_ready()
+        
+        feature_ranges = {}
+        for feature_name in self.base.feature_names:
+            col = self.base.X_df[feature_name]
+            is_numeric = pd.api.types.is_numeric_dtype(col.dtype)
+            
+            if is_numeric:
+                feature_ranges[feature_name] = {
+                    "type": "numeric",
+                    "min": float(col.min()),
+                    "max": float(col.max()),
+                    "mean": float(col.mean()),
+                    "std": float(col.std()),
+                    "median": float(col.median()),
+                    "step": self._calculate_step(col)
+                }
+            else:
+                # For categorical features, provide the most common categories
+                value_counts = col.value_counts()
+                feature_ranges[feature_name] = {
+                    "type": "categorical",
+                    "categories": value_counts.index.tolist(),
+                    "frequencies": value_counts.values.tolist(),
+                    "most_common": value_counts.index[0] if len(value_counts) > 0 else None
+                }
+        
+        return feature_ranges
+    
+    def _calculate_step(self, column: pd.Series) -> float:
+        """Calculate appropriate step size for numeric column."""
+        col_range = column.max() - column.min()
+        
+        # For very small ranges (< 1), use smaller steps
+        if col_range < 1:
+            return 0.01
+        # For medium ranges (1-100), use 0.1 or 1
+        elif col_range < 100:
+            return 0.1 if col_range < 10 else 1
+        # For large ranges, use larger steps
+        elif col_range < 1000:
+            return 10
+        else:
+            return 100
