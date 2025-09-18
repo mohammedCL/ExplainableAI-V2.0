@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Sliders, Zap, BarChart3, RefreshCw, Loader2, Target } from 'lucide-react';
 import { performWhatIf, getModelOverview } from '../../services/api';
+import ExplainWithAIButton from '../common/ExplainWithAIButton';
+import AIExplanationPanel from '../common/AIExplanationPanel';
 
 const FeatureSlider = ({ name, value, min, max, step, onChange }: {
     name: string;
@@ -103,7 +105,9 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [featureList, setFeatureList] = useState<string[]>([]);
+    const [featureRanges, setFeatureRanges] = useState<Record<string, any>>({});
     const [modelLoaded, setModelLoaded] = useState(false);
+    const [showAIExplanation, setShowAIExplanation] = useState(false);
 
     // Load model overview and feature names on component mount
     useEffect(() => {
@@ -142,6 +146,36 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
         loadModelInfo();
     }, []);
 
+    // Update initial feature values when ranges are loaded
+    useEffect(() => {
+        if (Object.keys(featureRanges).length > 0 && Object.keys(features).length > 0) {
+            const updatedFeatures = { ...features };
+            let hasChanges = false;
+            
+            Object.keys(featureRanges).forEach(feature => {
+                const range = featureRanges[feature];
+                if (range.type === 'numeric') {
+                    // Set to mean or median if available, otherwise use the middle of the range
+                    const newValue = range.mean || range.median || (range.min + range.max) / 2;
+                    if (Math.abs(updatedFeatures[feature] - newValue) > 0.01) { // Only update if significantly different
+                        updatedFeatures[feature] = newValue;
+                        hasChanges = true;
+                    }
+                } else if (range.type === 'categorical' && range.most_common) {
+                    // Set to most common category
+                    if (updatedFeatures[feature] !== range.most_common) {
+                        updatedFeatures[feature] = range.most_common;
+                        hasChanges = true;
+                    }
+                }
+            });
+            
+            if (hasChanges) {
+                setFeatures(updatedFeatures);
+            }
+        }
+    }, [featureRanges]);
+
     const performPrediction = async (currentFeatures: Record<string, any>) => {
         if (!modelLoaded) return;
         
@@ -150,14 +184,24 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
         
         try {
             const result = await performWhatIf(currentFeatures);
-            setPrediction(result.prediction || 0);
+            setPrediction(result.prediction_probability || result.prediction || 0);
             setConfidence(0.8); // Mock confidence since backend doesn't return it
             
-            // Calculate mock feature impacts (in a real app, this would come from SHAP or similar)
-            const impacts = Object.keys(currentFeatures).map(feature => ({
-                name: feature,
-                impact: Math.random() * 0.4 - 0.2 // Random impact between -0.2 and 0.2
-            }));
+            // Update feature ranges if provided in response
+            if (result.feature_ranges) {
+                setFeatureRanges(result.feature_ranges);
+            }
+            
+            // Calculate feature impacts from SHAP explanations if available
+            const impacts = result.shap_explanations ? 
+                Object.keys(result.shap_explanations).map(feature => ({
+                    name: feature,
+                    impact: result.shap_explanations[feature]
+                })) :
+                Object.keys(currentFeatures).map(feature => ({
+                    name: feature,
+                    impact: Math.random() * 0.4 - 0.2 // Fallback to random impact
+                }));
             setFeatureImpacts(impacts);
             
         } catch (err: any) {
@@ -208,6 +252,7 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
                     What-If Analysis
                 </h1>
                 <div className="flex items-center space-x-2">
+                    <ExplainWithAIButton onClick={() => setShowAIExplanation(true)} size="md" />
                     <button 
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
                         onClick={() => performPrediction(features)}
@@ -230,18 +275,13 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {featureList.map((feature) => {
                                 const value = features[feature] || 0;
-                                const isNumeric = typeof value === 'number';
+                                const featureRange = featureRanges[feature];
                                 
-                                if (isNumeric) {
-                                    // Determine appropriate range based on feature name
-                                    let min = 0, max = 100, step = 1;
-                                    if (feature.toLowerCase().includes('age')) {
-                                        min = 18; max = 80; step = 1;
-                                    } else if (feature.toLowerCase().includes('income')) {
-                                        min = 20000; max = 200000; step = 1000;
-                                    } else if (feature.toLowerCase().includes('score')) {
-                                        min = 300; max = 850; step = 10;
-                                    }
+                                if (featureRange && featureRange.type === 'numeric') {
+                                    // Use actual dataset ranges
+                                    const min = featureRange.min;
+                                    const max = featureRange.max;
+                                    const step = featureRange.step || 1;
                                     
                                     return (
                                         <FeatureSlider
@@ -254,16 +294,61 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
                                             onChange={(newValue) => handleFeatureChange(feature, newValue)}
                                         />
                                     );
-                                } else {
+                                } else if (featureRange && featureRange.type === 'categorical') {
+                                    // Handle categorical features with dropdown
                                     return (
-                                        <FeatureInput
-                                            key={feature}
-                                            name={feature}
-                                            value={value}
-                                            type="text"
-                                            onChange={(newValue) => handleFeatureChange(feature, newValue)}
-                                        />
+                                        <div key={feature} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                            <label className="block text-sm font-medium mb-2">{feature.replace('_', ' ')}</label>
+                                            <select
+                                                value={value}
+                                                onChange={(e) => handleFeatureChange(feature, e.target.value)}
+                                                className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-600 dark:border-gray-500"
+                                            >
+                                                {featureRange.categories.map((category: string) => (
+                                                    <option key={category} value={category}>
+                                                        {category}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     );
+                                } else {
+                                    // Fallback for features without range info (use hardcoded ranges)
+                                    const isNumeric = typeof value === 'number';
+                                    
+                                    if (isNumeric) {
+                                        // Fallback ranges based on feature name patterns
+                                        let min = 0, max = 100, step = 1;
+                                        if (feature.toLowerCase().includes('age')) {
+                                            min = 18; max = 80; step = 1;
+                                        } else if (feature.toLowerCase().includes('income')) {
+                                            min = 20000; max = 200000; step = 1000;
+                                        } else if (feature.toLowerCase().includes('score')) {
+                                            min = 300; max = 850; step = 10;
+                                        }
+                                        
+                                        return (
+                                            <FeatureSlider
+                                                key={feature}
+                                                name={feature}
+                                                value={value}
+                                                min={min}
+                                                max={max}
+                                                step={step}
+                                                onChange={(newValue) => handleFeatureChange(feature, newValue)}
+                                            />
+                                        );
+                                    } else {
+                                        return (
+                                            <FeatureInput
+                                                key={feature}
+                                                name={feature}
+                                                value={value}
+                                                type="text"
+                                                onChange={(newValue) => handleFeatureChange(feature, newValue)}
+                                            />
+                                        );
+                                    }
                                 }
                             })}
                         </div>
@@ -287,6 +372,21 @@ const WhatIfAnalysis: React.FC<{ modelType?: string }> = () => {
                     <PredictionDisplay prediction={prediction} confidence={confidence} />
                 </div>
             </div>
+
+            {/* AI Explanation Panel */}
+            <AIExplanationPanel
+                isOpen={showAIExplanation}
+                onClose={() => setShowAIExplanation(false)}
+                analysisType="what_if"
+                analysisData={{
+                    features,
+                    prediction,
+                    featureImpacts,
+                    featureRanges,
+                    modifiedFeatures: features
+                }}
+                title="What-If Analysis - AI Explanation"
+            />
         </div>
     );
 };
